@@ -81,7 +81,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
-    is_subscribed, last_subscribed = get_subscription_status(user_cache, context)
+    is_subscribed, last_subscribed = get_subscription_status(
+        user_cache, context)
     last_subscribed = cast(datetime, last_subscribed)
 
     # Check user constraints (subscription status and time)
@@ -172,11 +173,11 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_cache = cast(dict, context.user_data)
     reply = update.message.text.upper()
-    if re.fullmatch("^[A-z]{2}$", reply):
+    if re.fullmatch("^[A-Z]{2}$", reply):
         user_cache[DEPARTMENT] = reply
-    elif re.fullmatch("^[1-9]{3}$", reply):
+    elif re.fullmatch("^[1-9]{1}[0-9]{2}$", reply):
         user_cache[COURSE_NUM] = reply
-    elif re.fullmatch("^[A-z]{1}[1-9]{1}$", reply):
+    elif re.fullmatch("^[A-Z]{1}[1-9]{1}$", reply):
         user_cache[SECTION] = reply
     else:
         await update.message.reply_text("Invalid input. Please try again.")
@@ -266,27 +267,27 @@ def main():
     ]
 
     subscription_handler = ConversationHandler(
-        entry_points=[CommandHandler("subscribe", subscribe)],  # type: ignore
+        entry_points=[CommandHandler("subscribe", subscribe)],
         states={
-            AWAIT_SELECTION: selection_handlers,  # type: ignore
+            AWAIT_SELECTION: selection_handlers,
         },
         fallbacks=[
             CallbackQueryHandler(save_college_input, pattern="^[A-Z]{3}$"),
             MessageHandler(filters.REPLY, save_custom_input),
             CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
             CommandHandler("cancel", cancel)
-        ],  # type: ignore
+        ],
     )
     unsubscribe_handler = ConversationHandler(
         entry_points=[CommandHandler(
-            "unsubscribe", unsubscribe_dialog)],  # type: ignore
+            "unsubscribe", unsubscribe_dialog)],
         states={
-            AWAIT_SELECTION: [CallbackQueryHandler(unsubscribe, pattern="^" + SUBMIT + "$")], # type: ignore
+            AWAIT_SELECTION: [CallbackQueryHandler(unsubscribe, pattern="^" + SUBMIT + "$")],
         },
         fallbacks=[
             CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
             CommandHandler("cancel", cancel)
-        ],  # type: ignore
+        ],
     )
     application.add_handler(subscription_handler)
     application.add_handler(unsubscribe_handler)
