@@ -1,9 +1,7 @@
 import os
 import re
-import logging
 from datetime import datetime
 from typing import cast
-from dotenv import load_dotenv
 from telegram import (Update, InlineKeyboardMarkup, ForceReply, Message)
 from telegram.ext import (filters, MessageHandler, ApplicationBuilder,
                           CommandHandler, ContextTypes, ConversationHandler,
