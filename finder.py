@@ -1,7 +1,6 @@
 import os
 import time
 import asyncio
-from typing import Dict, List
 import telegram
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -18,8 +17,8 @@ options.add_argument('--no-sandbox')
 options.add_argument('--disable-gpu')
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
-COURSE_MAP: Dict[Course, List[str]] = {}
-COURSES_TO_REMOVE: List[Course] = []
+COURSE_MAP: dict[Course, list[str]] = {}
+COURSES_TO_REMOVE: list[Course] = []
 
 driver = webdriver.Chrome(executable_path=str(
     os.getenv("CHROMEDRIVER_PATH")), options=options)
