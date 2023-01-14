@@ -12,7 +12,6 @@ import client
 from course import Course
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
-GITHUB_URL = str(os.getenv("REPO_URL"))
 
 (
     AWAIT_SELECTION,
@@ -74,9 +73,7 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (f"Welcome to BU Class Finder {Course.SEMESTER} {Course.YEAR}!\n"
-            "Use the Menu button to get started.")
-    await update.message.reply_text(text)
+    await update.message.reply_text(conv.WELCOME_TEXT)
 
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -234,25 +231,15 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = ("• Use the bot commands to interact with the app\.\n"
-            "• Each user is limited to *ONE* subscription at any time\.\n "
-            "• Each user is allowed to change their subscription once every 24 hours\.\n"
-            "• Once your class is available, you will be notified and your subscription will be cleared\.")
-    await update.message.reply_markdown_v2(text)
+    await update.message.reply_markdown_v2(conv.HELP_TEXT)
 
 
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = ("BU Class Finder is built with *python\-telegram\-bot*, "
-            "*PyMongo*, *Selenium WebDriver*, and *Heroku*\. "
-            f"It is open\-source\. View the source code [here]({GITHUB_URL})\.")
-    await update.message.reply_markdown_v2(text)
+    await update.message.reply_markdown_v2(conv.ABOUT_TEXT)
 
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = ("Sorry, I didn't understand that command. "
-            "If you are currently in a subscription conversation, "
-            "please end it first,\nor use /cancel if you are stuck.")
-    await update.message.reply_text(text)
+    await update.message.reply_text(conv.UNKNOWN_CMD_TEXT)
 
 
 def main():
