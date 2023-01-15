@@ -102,6 +102,11 @@ def get_unsubscribe_buttons():
              InlineKeyboardButton("No", callback_data=CANCEL)]]
 
 
+def get_course_name(user_cache: dict[str, str]):
+    """Format course name to match input for Course class"""
+    return f"{user_cache[COLLEGE]} {user_cache[DEPARTMENT]}{user_cache[COURSE_NUM]} {user_cache[SECTION]}"
+
+
 def get_subscription_text(user_cache: dict):
     college = "" if not user_cache.get(
         COLLEGE) else user_cache[COLLEGE] + "\n"

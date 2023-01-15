@@ -12,7 +12,7 @@ class Course:
     YEAR = now.year + 1 if (SEMESTER == "Spring" and 10 <=
                             now.month <= 12) else now.year
     SEM_CODE = 3 if SEMESTER == "Fall" else 4
-    REFRESH_TIME = 60 * 60 * 24 # 24 hours
+    REFRESH_TIME = 60 * 60 * 24  # 24 hours
 
     def __init__(self, full_course: str):
         college, dep_num, section = full_course.split()

@@ -5,9 +5,9 @@ from pymongo import MongoClient
 MONGO_URL = str(os.getenv("MONGO_URL"))
 
 mongo_client = MongoClient(MONGO_URL)
-db = mongo_client["prod_db"]
-course_collection = db["courses"]
-user_collection = db["users"]
+mongo_db = mongo_client["prod_db"]
+course_collection = mongo_db["courses"]
+user_collection = mongo_db["users"]
 
 
 def find_all_courses():
