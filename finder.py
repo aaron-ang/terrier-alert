@@ -7,7 +7,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-import client
+import db
 from course import Course
 
 options = webdriver.ChromeOptions()
@@ -27,7 +27,7 @@ bot = telegram.Bot(token=BOT_TOKEN)
 
 
 async def search_courses():
-    for course in client.find_all_courses():
+    for course in db.find_all_courses():
         users = list(course["users"])
         # prune courses with no users
         if len(users) == 0:
@@ -87,7 +87,7 @@ async def main():
         await search_courses()
 
         for course in COURSES_TO_REMOVE:
-            client.remove_course(str(course))
+            db.remove_course(str(course))
             if course in COURSE_MAP:
                 COURSE_MAP.pop(course)
         COURSES_TO_REMOVE.clear()

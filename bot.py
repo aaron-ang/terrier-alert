@@ -8,7 +8,7 @@ from telegram.ext import (filters, MessageHandler, ApplicationBuilder,
                           CallbackQueryHandler)
 
 import conv
-import client
+import db
 from course import Course
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
@@ -33,9 +33,7 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 ) = map(chr, range(6))
 
 
-def get_course_name(user_cache: dict[str, str]):
-    """Format course name to match input for Course class"""
-    return f"{user_cache[COLLEGE]} {user_cache[DEPARTMENT]}{user_cache[COURSE_NUM]} {user_cache[SECTION]}"
+"""Helper functions"""
 
 
 def update_cache(user_cache, user_course: dict[str, str] | None):
@@ -62,14 +60,17 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
 
     if is_subscribed is None:
         # update cache from db
-        user_course = client.find_user_course(user_id)
+        user_course = db.find_user_course(user_id)
         update_cache(user_cache, user_course)
 
     if last_subscribed is None:
-        user = client.find_user(user_id)
+        user = db.find_user(user_id)
         user_cache[LAST_SUBSCRIBED] = user["last_subscribed"] if user else None
 
     return user_cache[IS_SUBSCRIBED], user_cache[LAST_SUBSCRIBED]
+
+
+"""Conversation callbacks"""
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -84,7 +85,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Check user constraints (subscription status and time)
     if is_subscribed:
-        course_name = get_course_name(user_cache)
+        course_name = conv.get_course_name(user_cache)
         text = (f"*You are already subscribed to {course_name}*\!\n\n"
                 "Use /unsubscribe to remove your subscription\."
                 )
@@ -189,11 +190,11 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.edit_message_text("Submitting...")
 
     user_cache = cast(dict, context.user_data)
-    course_name = get_course_name(user_cache)
+    course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
-    client.update_db(course_name, user_id)
+    db.update_db(course_name, user_id)
     curr_time = datetime.utcnow()
-    client.update_user_subscription_time(user_id, curr_time)
+    db.update_user_subscription_time(user_id, curr_time)
 
     user_cache[IS_SUBSCRIBED] = True
     user_cache[LAST_SUBSCRIBED] = curr_time
@@ -221,8 +222,8 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_cache = cast(dict, context.user_data)
-    course_name = get_course_name(user_cache)
-    client.remove_user(course_name, str(context._user_id))
+    course_name = conv.get_course_name(user_cache)
+    db.remove_user(course_name, str(context._user_id))
     user_cache.clear()
     user_cache[IS_SUBSCRIBED] = False
 
