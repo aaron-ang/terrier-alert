@@ -15,6 +15,7 @@ options.binary_location = str(os.getenv("GOOGLE_CHROME_BIN"))
 options.add_argument('--headless')
 options.add_argument('--no-sandbox')
 options.add_argument('--disable-gpu')
+options.add_argument('--disable-dev-shm-usage')
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 COURSE_MAP: dict[Course, list[str]] = {}

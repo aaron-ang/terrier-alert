@@ -1,6 +1,6 @@
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import cast
 from telegram import (Update, InlineKeyboardMarkup,
                       ForceReply, Message, constants)
@@ -94,11 +94,11 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     if last_subscribed:
-        subscribed_elapsed = datetime.now() - last_subscribed
-        remaining_time = Course.REFRESH_TIME - subscribed_elapsed.total_seconds()
-        if remaining_time > 0:
+        next_subscribed = last_subscribed + timedelta(hours=Course.REFRESH_TIME_HOURS)
+        if datetime.now() < next_subscribed:
+            next_subscribed_local = next_subscribed.astimezone().strftime("%I:%M%p")
             text = ("*You have recently subscribed to a course*\.\n\n"
-                    f"Please wait {int(remaining_time // 60)} more minutes before subscribing\."
+                    f"Please wait until {next_subscribed_local} EST to subscribe\."
                     )
             await update.message.reply_markdown_v2(text)
             return ConversationHandler.END
@@ -122,7 +122,6 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer()
         await cast(Message, update.effective_message).edit_text("Transaction cancelled.")
     else:
-        # await cast(Message, update.effective_message).delete()
         await context.bot.send_message(context._chat_id, "Transaction cancelled.")
 
     return ConversationHandler.END
@@ -187,7 +186,6 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_cache[SECTION] = reply
     else:
         await message.reply_text("Invalid input. Please try again.")
-        return AWAIT_CUSTOM_INPUT
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
@@ -197,7 +195,6 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
                                         message_id=user_cache[SUBSCRIPTION_MSG_ID],
                                         parse_mode=constants.ParseMode.MARKDOWN_V2,
                                         reply_markup=keyboard)
-
     return AWAIT_SELECTION
 
 
@@ -285,7 +282,7 @@ def main():
         fallbacks=[
             CallbackQueryHandler(save_college_input, pattern="^[A-Z]{3}$"),
             CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
-            # CommandHandler("cancel", cancel)
+            CommandHandler("cancel", cancel)
         ],
     )
     unsubscribe_handler = ConversationHandler(
@@ -297,7 +294,7 @@ def main():
         },
         fallbacks=[
             CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
-            # CommandHandler("cancel", cancel)
+            CommandHandler("cancel", cancel)
         ],
     )
     application.add_handler(subscription_handler)
