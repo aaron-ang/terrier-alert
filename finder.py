@@ -48,11 +48,11 @@ async def search_courses():
 
 async def process_course(course: Course):
     # check for pinned message
-
+    PINNED_XPATH = "/html/body/table[4]/tbody/tr[2]/td[1]/font/table/tbody/tr/td[1]/img"
     RESULT_XPATH = "/html/body/table[4]/tbody/tr[3]" if driver.find_elements(
-        By.XPATH, "/html/body/table[4]/tbody/tr[2]/td[1]/font/table/tbody/tr/td[1]/img") else "/html/body/table[4]/tbody/tr[2]"
+        By.XPATH, PINNED_XPATH) else "/html/body/table[4]/tbody/tr[2]"
 
-    keywords = ["Class Full", "Class Closed"]
+    keywords = ["Class Full"]
     try:
         # check validity of class
         course_name = driver.find_element(
@@ -60,25 +60,33 @@ async def process_course(course: Course):
 
         if course_name != str(course):
             msg = f"{str(course)} is not available. Did you mean {course_name}?"
-            for uid in COURSE_MAP[course]:
-                await bot.send_message(uid, msg)
-            COURSES_TO_REMOVE.append(course)
+            await notify_users(course, msg)
+            return
+
+        class_remark = driver.find_element(
+            By.XPATH, RESULT_XPATH + "/td[13]/font").text
+        if class_remark == "Class Closed":
+            msg = f"{str(course)} is closed. Please join the course waitlist or contact your instructor."
+            await notify_users(course, msg)
             return
 
         num_seats = driver.find_element(
             By.XPATH, RESULT_XPATH + "/td[7]/font").text
-        is_blocked = any([kw in driver.find_element(
-            By.XPATH, RESULT_XPATH + "/td[13]/font").text for kw in keywords])
+        is_blocked = class_remark in keywords
         is_avail = int(num_seats) > 0 and not is_blocked
 
         if is_avail:
             msg = f"{str(course)} is now available at {course.reg_url}"
-            for uid in COURSE_MAP[course]:
-                await bot.send_message(uid, msg)
-            COURSES_TO_REMOVE.append(course)
+            await notify_users(course, msg)
 
     except Exception:
         return
+
+
+async def notify_users(course: Course, msg: str):
+    for uid in COURSE_MAP[course]:
+        await bot.send_message(uid, msg)
+    COURSES_TO_REMOVE.append(course)
 
 
 async def main():

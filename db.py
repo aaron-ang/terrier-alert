@@ -46,6 +46,12 @@ def update_user_subscription_time(uid: str, time: datetime):
         {"user": uid}, {"$set": {"last_subscribed": time}}, upsert=True)
 
 
+def update_user_subscription_status(uid: str, is_subscribed: bool):
+    """Update user's most recent unsubscription status"""
+    user_collection.update_one(
+        {"user": uid}, {"$set": {"is_subscribed": is_subscribed}})
+
+
 def update_db(course_name: str, uid: str):
     """Update course with new user, inserting new course if necessary"""
     course_collection.update_one(

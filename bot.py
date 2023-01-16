@@ -2,10 +2,10 @@ import os
 import re
 from datetime import datetime
 from typing import cast
-from telegram import (Update, InlineKeyboardMarkup, ForceReply, Message)
-from telegram.ext import (filters, MessageHandler, ApplicationBuilder,
-                          CommandHandler, ContextTypes, ConversationHandler,
-                          CallbackQueryHandler)
+from telegram import (Update, InlineKeyboardMarkup,
+                      ForceReply, Message, constants)
+from telegram.ext import (filters, ApplicationBuilder, CommandHandler,
+                          ContextTypes, ConversationHandler, CallbackQueryHandler, MessageHandler)
 
 import conv
 import db
@@ -15,13 +15,14 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 
 (
     AWAIT_SELECTION,
+    AWAIT_CUSTOM_INPUT,
     INPUT_COLLEGE,
     INPUT_DEPARTMENT,
     INPUT_COURSE_NUM,
     INPUT_SECTION,
     SUBMIT,
     CANCEL
-) = map(chr, range(7))
+) = map(chr, range(8))
 
 (
     COLLEGE,
@@ -29,8 +30,10 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
     COURSE_NUM,
     SECTION,
     IS_SUBSCRIBED,
-    LAST_SUBSCRIBED
-) = map(chr, range(6))
+    LAST_SUBSCRIBED,
+    SUBSCRIPTION_MSG_ID,
+    PROMPT_MSG_ID
+) = map(chr, range(8))
 
 
 """Helper functions"""
@@ -54,16 +57,14 @@ def update_cache(user_cache, user_course: dict[str, str] | None):
 
 def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
     """Check user subscription and updates cache"""
-    is_subscribed = user_cache.get(IS_SUBSCRIBED)
-    last_subscribed = user_cache.get(LAST_SUBSCRIBED)
     user_id = str(context._user_id)
 
-    if is_subscribed is None:
+    if user_cache.get(IS_SUBSCRIBED) is None:
         # update cache from db
         user_course = db.find_user_course(user_id)
         update_cache(user_cache, user_course)
 
-    if last_subscribed is None:
+    if user_cache.get(LAST_SUBSCRIBED) is None:
         user = db.find_user(user_id)
         user_cache[LAST_SUBSCRIBED] = user["last_subscribed"] if user else None
 
@@ -104,21 +105,17 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
-
     subscription_text = conv.get_subscription_text(user_cache)
-    query = update.callback_query
-    if query:
-        await query.answer()
-        await query.edit_message_text(subscription_text, reply_markup=keyboard, parse_mode="MarkdownV2")
-    else:
-        await update.message.reply_markdown_v2(subscription_text, reply_markup=keyboard)
+    conv_message = await update.message.reply_markdown_v2(subscription_text, reply_markup=keyboard)
+    user_cache[SUBSCRIPTION_MSG_ID] = conv_message.message_id
 
     return AWAIT_SELECTION
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels and ends the conversation"""
-    # cast(dict, context.user_data).clear()
+    for key in (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION):
+        context.user_data.pop(key, None)
     query = update.callback_query
     # handle function entries: callback or command
     if query:
@@ -126,7 +123,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await cast(Message, update.effective_message).edit_text("Transaction cancelled.")
     else:
         # await cast(Message, update.effective_message).delete()
-        await context.bot.send_message(update.message.chat_id, "Transaction cancelled.")
+        await context.bot.send_message(context._chat_id, "Transaction cancelled.")
 
     return ConversationHandler.END
 
@@ -143,7 +140,7 @@ async def handle_college_input(update: Update, context: ContextTypes.DEFAULT_TYP
 async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.message.delete()
+    await query.edit_message_reply_markup()
 
     keyword = ""
     if query.data == INPUT_DEPARTMENT:
@@ -153,7 +150,9 @@ async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif query.data == INPUT_SECTION:
         keyword = "section"
 
-    await context.bot.send_message(query.message.chat_id, f"State the {keyword}", reply_markup=ForceReply())
+    prompt = await context.bot.send_message(context._chat_id, f"State the {keyword}", reply_markup=ForceReply())
+    context.user_data[PROMPT_MSG_ID] = prompt.message_id
+    return AWAIT_CUSTOM_INPUT
 
 
 async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -162,15 +161,24 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_cache = cast(dict, context.user_data)
     user_cache[COLLEGE] = query_data
 
-    return await subscribe(update, context)
+    buttons = conv.get_main_buttons(user_cache)
+    keyboard = InlineKeyboardMarkup(buttons)
+    subscription_text = conv.get_subscription_text(user_cache)
+    await update.callback_query.edit_message_text(text=subscription_text,
+                                                  parse_mode=constants.ParseMode.MARKDOWN_V2,
+                                                  reply_markup=keyboard)
+
+    return AWAIT_SELECTION
 
 
 async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check callback data and update cache for custom inputs"""
-    await cast(Message, update.effective_message).delete()
-
+    message = update.message
     user_cache = cast(dict, context.user_data)
-    reply = update.message.text.upper()
+    reply = message.text.upper()
+    await message.delete()
+    await context.bot.delete_message(context._chat_id, context.user_data[PROMPT_MSG_ID])
+
     if re.fullmatch("^[A-Z]{2}$", reply):
         user_cache[DEPARTMENT] = reply
     elif re.fullmatch("^[1-9]{1}[0-9]{2}$", reply):
@@ -178,9 +186,19 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif re.fullmatch("^[A-Z]{1}[1-9]{1}$", reply):
         user_cache[SECTION] = reply
     else:
-        await update.message.reply_text("Invalid input. Please try again.")
+        await message.reply_text("Invalid input. Please try again.")
+        return AWAIT_CUSTOM_INPUT
 
-    return await subscribe(update, context)
+    buttons = conv.get_main_buttons(user_cache)
+    keyboard = InlineKeyboardMarkup(buttons)
+    subscription_text = conv.get_subscription_text(user_cache)
+    await context.bot.edit_message_text(text=subscription_text,
+                                        chat_id=context._chat_id,
+                                        message_id=user_cache[SUBSCRIPTION_MSG_ID],
+                                        parse_mode=constants.ParseMode.MARKDOWN_V2,
+                                        reply_markup=keyboard)
+
+    return AWAIT_SELECTION
 
 
 async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -195,6 +213,7 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.update_db(course_name, user_id)
     curr_time = datetime.utcnow()
     db.update_user_subscription_time(user_id, curr_time)
+    db.update_user_subscription_status(user_id, True)
 
     user_cache[IS_SUBSCRIBED] = True
     user_cache[LAST_SUBSCRIBED] = curr_time
@@ -223,8 +242,11 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_cache = cast(dict, context.user_data)
     course_name = conv.get_course_name(user_cache)
-    db.remove_user(course_name, str(context._user_id))
-    user_cache.clear()
+    user_id = str(context._user_id)
+    db.remove_user(course_name, user_id)
+    db.update_user_subscription_status(user_id, False)
+    for key in (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION):
+        context.user_data.pop(key, None)
     user_cache[IS_SUBSCRIBED] = False
 
     await cast(Message, update._effective_message).edit_text(f"You have been unsubscribed from {course_name}.")
@@ -258,23 +280,24 @@ def main():
         entry_points=[CommandHandler("subscribe", subscribe)],
         states={
             AWAIT_SELECTION: selection_handlers,
+            AWAIT_CUSTOM_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_custom_input)],
         },
         fallbacks=[
             CallbackQueryHandler(save_college_input, pattern="^[A-Z]{3}$"),
-            MessageHandler(filters.REPLY, save_custom_input),
             CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
-            CommandHandler("cancel", cancel)
+            # CommandHandler("cancel", cancel)
         ],
     )
     unsubscribe_handler = ConversationHandler(
         entry_points=[CommandHandler(
             "unsubscribe", unsubscribe_dialog)],
         states={
-            AWAIT_SELECTION: [CallbackQueryHandler(unsubscribe, pattern="^" + SUBMIT + "$")],
+            AWAIT_SELECTION: [CallbackQueryHandler(
+                unsubscribe, pattern="^" + SUBMIT + "$")]
         },
         fallbacks=[
             CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
-            CommandHandler("cancel", cancel)
+            # CommandHandler("cancel", cancel)
         ],
     )
     application.add_handler(subscription_handler)
