@@ -2,27 +2,10 @@ import os
 from telegram import InlineKeyboardButton
 
 from course import Course
+from bot import (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION, INPUT_COLLEGE,
+                 INPUT_DEPARTMENT, INPUT_COURSE_NUM, INPUT_SECTION, CANCEL, SUBMIT)
 
 GITHUB_URL = str(os.getenv("GITHUB_URL"))
-
-(
-    AWAIT_SELECTION,
-    INPUT_COLLEGE,
-    INPUT_DEPARTMENT,
-    INPUT_COURSE_NUM,
-    INPUT_SECTION,
-    SUBMIT,
-    CANCEL
-) = map(chr, range(7))
-
-(
-    COLLEGE,
-    DEPARTMENT,
-    COURSE_NUM,
-    SECTION,
-    IS_SUBSCRIBED,
-    LAST_SUBSCRIBED
-) = map(chr, range(6))
 
 WELCOME_TEXT = f"Welcome to Terrier Alert {Course.SEMESTER} {Course.YEAR}!\nUse the Menu button to get started."
 NOT_SUBSCRIBED_TEXT = "You are not subscribed to any course. Use /subscribe to start a subscription."
@@ -35,8 +18,9 @@ ABOUT_TEXT = ("Terrier Alert is built with *python\-telegram\-bot*, *PyMongo*, *
               f"It is open\-source\. View the source code [here]({GITHUB_URL})\.")
 UNKNOWN_CMD_TEXT = ("Sorry, I didn't understand that command. If you are currently in a subscription conversation, "
                     "please end it first,\nor use /cancel if you are stuck.")
-
 COLLEGES = ["CAS", "CDS", "COM", "ENG", "SAR", "QST"]
+INPUT_FIELDS = {INPUT_COLLEGE, INPUT_DEPARTMENT,
+                INPUT_COURSE_NUM, INPUT_SECTION}
 
 
 def get_main_buttons(user_cache: dict):
@@ -81,7 +65,7 @@ def get_main_buttons(user_cache: dict):
                 callback_data=INPUT_SECTION
             )
 
-    if len(dict(user_cache)) == 6:
+    if INPUT_FIELDS.issubset(user_cache):
         buttons.insert(2, [InlineKeyboardButton(
             text="Submit", callback_data=SUBMIT)])
 

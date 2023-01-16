@@ -17,4 +17,5 @@ Each document in the _courses_ collection has the following schema:
 Each document in the _users_ collection has the following schema:
 * _id: `ObjectId`
 * user: `String`
+* is_subscribed: `Boolean`
 * last_subscribed: `Date`
