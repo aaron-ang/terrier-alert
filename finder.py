@@ -1,6 +1,7 @@
 import os
 import time
 import asyncio
+import logging
 import telegram
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -10,6 +11,12 @@ from selenium.webdriver.chrome.service import Service
 
 import db
 from course import Course
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 options = webdriver.ChromeOptions()
 options.binary_location = str(os.getenv("GOOGLE_CHROME_BIN"))
