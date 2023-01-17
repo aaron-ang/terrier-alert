@@ -6,6 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
 
 import db
 from course import Course
@@ -21,8 +22,8 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 COURSE_MAP: dict[Course, list[str]] = {}
 COURSES_TO_REMOVE: list[Course] = []
 
-driver = webdriver.Chrome(executable_path=str(
-    os.getenv("CHROMEDRIVER_PATH")), options=options)
+driver = webdriver.Chrome(service=Service(str(os.getenv("CHROMEDRIVER_PATH"))),
+                          options=options)
 wait = WebDriverWait(driver, timeout=30)
 bot = telegram.Bot(token=BOT_TOKEN)
 
