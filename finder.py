@@ -90,6 +90,7 @@ async def process_course(course: Course):
 async def notify_users(course: Course, msg: str):
     for uid in COURSE_MAP[course]:
         await bot.send_message(uid, msg, write_timeout=TIMEOUT_SECONDS)
+        db.update_user_subscription_status(uid, False)
     COURSES_TO_REMOVE.append(course)
 
 

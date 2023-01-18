@@ -39,11 +39,10 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 """Helper functions"""
 
 
-def update_cache(user_cache, user_course: dict[str, str] | None):
-    """Updates user cache with course information and subscription status"""
+def handle_subscription(user_cache, user_course: dict[str, str] | None):
+    """Updates user cache with course information and return subscription status"""
     if user_course is None:
-        user_cache[IS_SUBSCRIBED] = False
-        return
+        return False
 
     college, dep_num, section = user_course["name"].split()
     department, number = dep_num[:2], dep_num[2:]
@@ -52,7 +51,8 @@ def update_cache(user_cache, user_course: dict[str, str] | None):
     user_cache[DEPARTMENT] = department
     user_cache[COURSE_NUM] = number
     user_cache[SECTION] = section
-    user_cache[IS_SUBSCRIBED] = True
+
+    return True
 
 
 def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
@@ -60,9 +60,9 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
     user_id = str(context._user_id)
 
     if user_cache.get(IS_SUBSCRIBED) is None:
-        # update cache from db
         user_course = db.find_user_course(user_id)
-        update_cache(user_cache, user_course)
+        user_cache[IS_SUBSCRIBED] = handle_subscription(
+            user_cache, user_course)
 
     if user_cache.get(LAST_SUBSCRIBED) is None:
         user = db.find_user(user_id)
@@ -280,7 +280,7 @@ def main():
         entry_points=[CommandHandler("subscribe", subscribe)],
         states={
             AWAIT_SELECTION: selection_handlers,
-            AWAIT_CUSTOM_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_custom_input)],
+            AWAIT_CUSTOM_INPUT: [MessageHandler(filters.REPLY, save_custom_input)],
         },
         fallbacks=[
             CallbackQueryHandler(save_college_input, pattern="^[A-Z]{3}$"),
