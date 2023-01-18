@@ -1,7 +1,6 @@
 import os
 import time
 import asyncio
-import logging
 import telegram
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -12,14 +11,12 @@ from selenium.webdriver.chrome.service import Service
 import db
 from course import Course
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
 
 options = webdriver.ChromeOptions()
 options.binary_location = str(os.getenv("GOOGLE_CHROME_BIN"))
+options.add_argument('--no-sandbox')
+options.add_argument('--headless')
+options.add_argument('disable-infobars')
 options.add_argument('--disable-dev-shm-usage')
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
@@ -27,7 +24,7 @@ COURSE_MAP: dict[Course, list[str]] = {}
 COURSES_TO_REMOVE: list[Course] = []
 TIMEOUT_SECONDS = 5
 
-driver = webdriver.Chrome(service=Service(str(os.getenv("CHROMEDRIVER_PATH"))),
+driver = webdriver.Chrome(service=Service(executable_path=str(os.getenv("CHROMEDRIVER_PATH"))),
                           options=options)
 wait = WebDriverWait(driver, timeout=30)
 bot = telegram.Bot(token=BOT_TOKEN)
