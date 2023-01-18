@@ -2,8 +2,8 @@ import os
 from telegram import InlineKeyboardButton
 
 from course import Course
-from bot import (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION, INPUT_COLLEGE,
-                 INPUT_DEPARTMENT, INPUT_COURSE_NUM, INPUT_SECTION, CANCEL, SUBMIT)
+from bot import (INPUT_COLLEGE, INPUT_DEPARTMENT, INPUT_COURSE_NUM, INPUT_SECTION, SUBMIT, CANCEL,
+                 COLLEGE, DEPARTMENT, COURSE_NUM, SECTION)
 
 GITHUB_URL = str(os.getenv("GITHUB_URL"))
 
@@ -11,7 +11,7 @@ WELCOME_TEXT = f"Welcome to Terrier Alert {Course.SEMESTER} {Course.YEAR}!\nUse 
 NOT_SUBSCRIBED_TEXT = "You are not subscribed to any course. Use /subscribe to start a subscription."
 UNSUBSCRIBE_TEXT = "You can only resubscribe 24 hours after your last subscription. Are you sure you want to unsubscribe?"
 HELP_TEXT = ("• Use the bot commands to interact with the app\.\n"
-             "• Each user is limited to *ONE* subscription at any time\.\n "
+             "• Each user is limited to *ONE* subscription at any time\.\n"
              "• Each user is allowed to change their subscription once every 24 hours\.\n"
              "• Once your class is available, you will be notified and your subscription will be cleared\.")
 ABOUT_TEXT = ("Terrier Alert is built with *python\-telegram\-bot*, *PyMongo*, *Selenium WebDriver*, and *Heroku*\. "
@@ -19,8 +19,7 @@ ABOUT_TEXT = ("Terrier Alert is built with *python\-telegram\-bot*, *PyMongo*, *
 UNKNOWN_CMD_TEXT = ("Sorry, I didn't understand that command. If you are currently in a subscription conversation, "
                     "please end it first,\nor use /cancel if you are stuck.")
 COLLEGES = ["CAS", "CDS", "COM", "ENG", "SAR", "QST"]
-INPUT_FIELDS = {INPUT_COLLEGE, INPUT_DEPARTMENT,
-                INPUT_COURSE_NUM, INPUT_SECTION}
+FORM_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
 
 def get_main_buttons(user_cache: dict):
@@ -65,7 +64,7 @@ def get_main_buttons(user_cache: dict):
                 callback_data=INPUT_SECTION
             )
 
-    if INPUT_FIELDS.issubset(user_cache):
+    if FORM_FIELDS.issubset(user_cache):
         buttons.insert(2, [InlineKeyboardButton(
             text="Submit", callback_data=SUBMIT)])
 
