@@ -1,6 +1,7 @@
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import cast
 from telegram import (Update, InlineKeyboardMarkup,
                       ForceReply, Message, constants)
@@ -34,7 +35,6 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
     SUBSCRIPTION_MSG_ID,
     PROMPT_MSG_ID
 ) = map(chr, range(8))
-
 
 """Helper functions"""
 
@@ -94,11 +94,14 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     if last_subscribed:
-        next_subscribed = last_subscribed + timedelta(hours=Course.REFRESH_TIME_HOURS)
-        if datetime.now() < next_subscribed:
-            next_subscribed_local = next_subscribed.astimezone().strftime("%I:%M%p")
+        next_subscribed = last_subscribed + \
+            timedelta(hours=Course.REFRESH_TIME_HOURS)
+        next_subscribed = next_subscribed.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) < next_subscribed:
+            next_subscribed_local = next_subscribed.astimezone(
+                ZoneInfo("America/New_York")).strftime("%b %d %I:%M%p %Z")
             text = ("*You have recently subscribed to a course*\.\n\n"
-                    f"Please wait until {next_subscribed_local} EST to subscribe\."
+                    f"Please wait until {next_subscribed_local} to subscribe\."
                     )
             await update.message.reply_markdown_v2(text)
             return ConversationHandler.END
@@ -182,7 +185,7 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_cache[DEPARTMENT] = reply
     elif re.fullmatch("^[1-9]{1}[0-9]{2}$", reply):
         user_cache[COURSE_NUM] = reply
-    elif re.fullmatch("^[A-Z]{1}[1-9]{1}$", reply):
+    elif re.fullmatch("^[A-Z]{1}[A-Z1-9]{1}$", reply):
         user_cache[SECTION] = reply
     else:
         await message.reply_text("Invalid input. Please try again.")

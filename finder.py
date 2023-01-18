@@ -20,14 +20,12 @@ logger = logging.getLogger(__name__)
 
 options = webdriver.ChromeOptions()
 options.binary_location = str(os.getenv("GOOGLE_CHROME_BIN"))
-options.add_argument('--headless')
-options.add_argument('--no-sandbox')
-options.add_argument('--disable-gpu')
 options.add_argument('--disable-dev-shm-usage')
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 COURSE_MAP: dict[Course, list[str]] = {}
 COURSES_TO_REMOVE: list[Course] = []
+TIMEOUT_SECONDS = 5
 
 driver = webdriver.Chrome(service=Service(str(os.getenv("CHROMEDRIVER_PATH"))),
                           options=options)
@@ -94,7 +92,7 @@ async def process_course(course: Course):
 
 async def notify_users(course: Course, msg: str):
     for uid in COURSE_MAP[course]:
-        await bot.send_message(uid, msg)
+        await bot.send_message(uid, msg, write_timeout=TIMEOUT_SECONDS)
     COURSES_TO_REMOVE.append(course)
 
 
