@@ -56,7 +56,7 @@ async def process_course(course: Course):
     RESULT_XPATH = "/html/body/table[4]/tbody/tr[3]" if driver.find_elements(
         By.XPATH, PINNED_XPATH) else "/html/body/table[4]/tbody/tr[2]"
 
-    keywords = ["Class Full"]
+    # keywords = ["Class Full"]
     try:
         # check validity of class
         course_name = driver.find_element(
@@ -69,15 +69,16 @@ async def process_course(course: Course):
 
         class_remark = driver.find_element(
             By.XPATH, RESULT_XPATH + "/td[13]/font").text
-        if class_remark == "Class Closed":
+        if "Class Closed" in class_remark:
             msg = f"{str(course)} is closed. Please join the course waitlist or contact your instructor."
             await notify_users(course, msg)
             return
 
         num_seats = driver.find_element(
             By.XPATH, RESULT_XPATH + "/td[7]/font").text
-        is_blocked = class_remark in keywords
-        is_avail = int(num_seats) > 0 and not is_blocked
+        # is_blocked = any([kw for kw in keywords if kw in class_remark])
+        is_full = "Class Full" in class_remark
+        is_avail = not is_full and int(num_seats) > 0
 
         if is_avail:
             msg = f"{str(course)} is now available at {course.reg_url}"
