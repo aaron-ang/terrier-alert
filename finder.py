@@ -56,7 +56,7 @@ async def process_course(course: Course):
     RESULT_XPATH = "/html/body/table[4]/tbody/tr[3]" if driver.find_elements(
         By.XPATH, PINNED_XPATH) else "/html/body/table[4]/tbody/tr[2]"
 
-    # keywords = ["Class Full"]
+    keywords = ["Class Closed", "WebReg Restricted"]
     try:
         # check validity of class
         course_name = driver.find_element(
@@ -69,14 +69,13 @@ async def process_course(course: Course):
 
         class_remark = driver.find_element(
             By.XPATH, RESULT_XPATH + "/td[13]/font").text
-        if "Class Closed" in class_remark:
-            msg = f"{str(course)} is closed. Please join the course waitlist or contact your instructor."
+        if any([kw for kw in keywords if kw in class_remark]):
+            msg = f"Registration for {str(course)} is restricted. Please join the course waitlist or contact your instructor."
             await notify_users(course, msg)
             return
 
         num_seats = driver.find_element(
             By.XPATH, RESULT_XPATH + "/td[7]/font").text
-        # is_blocked = any([kw for kw in keywords if kw in class_remark])
         is_full = "Class Full" in class_remark
         is_avail = not is_full and int(num_seats) > 0
 
@@ -96,17 +95,19 @@ async def notify_users(course: Course, msg: str):
 
 
 async def main():
-    # Scrape website every minute
-    while True:
-        await search_courses()
+    # One-time scrape 
+    # Use Heroku scheduler to run this script every 10 min
+    # to save dyno hours
+    # while True:
+    await search_courses()
 
-        for course in COURSES_TO_REMOVE:
-            db.remove_course(str(course))
-            if course in COURSE_MAP:
-                COURSE_MAP.pop(course)
-        COURSES_TO_REMOVE.clear()
+    for course in COURSES_TO_REMOVE:
+        db.remove_course(str(course))
+        if course in COURSE_MAP:
+            COURSE_MAP.pop(course)
+    COURSES_TO_REMOVE.clear()
 
-        time.sleep(60)
+        # time.sleep(60)
 
 
 if __name__ == "__main__":
