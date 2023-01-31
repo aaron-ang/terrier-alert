@@ -101,11 +101,11 @@ async def main():
     # while True:
     await search_courses()
 
-    for course in COURSES_TO_REMOVE:
+    while COURSES_TO_REMOVE:
+        course = COURSES_TO_REMOVE.pop()
         db.remove_course(str(course))
-        if course in COURSE_MAP:
-            COURSE_MAP.pop(course)
-    COURSES_TO_REMOVE.clear()
+    
+    COURSE_MAP.clear()
 
         # time.sleep(60)
 
