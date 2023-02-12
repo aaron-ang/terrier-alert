@@ -159,9 +159,11 @@ async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check callback data and update cache for chosen college"""
-    query_data = update.callback_query.data
+    query = update.callback_query
+    await query.answer()
+    
     user_cache = cast(dict, context.user_data)
-    user_cache[COLLEGE] = query_data
+    user_cache[COLLEGE] = query.data
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
@@ -246,7 +248,7 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     db.remove_user(course_name, user_id)
     db.update_user_subscription_status(user_id, False)
     for key in (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION):
-        context.user_data.pop(key, None)
+        user_cache.pop(key, None)
     user_cache[IS_SUBSCRIBED] = False
 
     await cast(Message, update._effective_message).edit_text(f"You have been unsubscribed from {course_name}.")
