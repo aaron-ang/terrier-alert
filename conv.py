@@ -77,6 +77,7 @@ def get_college_buttons():
          for college in COLLEGES[:3]],
         [InlineKeyboardButton(text=college, callback_data=college)
          for college in COLLEGES[3:]],
+        [InlineKeyboardButton(text="PDP", callback_data="PDP")]
     ]
 
 
