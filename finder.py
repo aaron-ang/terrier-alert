@@ -95,19 +95,16 @@ async def notify_users(course: Course, msg: str):
 
 
 async def main():
-    # One-time scrape 
-    # Use Heroku scheduler to run this script every 10 min
-    # to save dyno hours
-    # while True:
-    await search_courses()
+    while True:
+        await search_courses()
 
-    while COURSES_TO_REMOVE:
-        course = COURSES_TO_REMOVE.pop()
-        db.remove_course(str(course))
-    
-    COURSE_MAP.clear()
+        while COURSES_TO_REMOVE:
+            course = COURSES_TO_REMOVE.pop()
+            db.remove_course(str(course))
+        
+        COURSE_MAP.clear()
 
-        # time.sleep(60)
+        time.sleep(60)
 
 
 if __name__ == "__main__":

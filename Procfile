@@ -1,2 +1,1 @@
-worker1: python3 bot.py
-worker2: python3 finder.py
+worker: trap '' SIGTERM; python3 bot.py & python3 finder.py & wait -n; kill -SIGTERM -$$; wait
