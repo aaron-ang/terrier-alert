@@ -31,7 +31,7 @@ bot = telegram.Bot(token=BOT_TOKEN)
 
 
 async def search_courses():
-    for course in db.find_all_courses():
+    for course in db.get_all_courses():
         users = list(course["users"])
         # prune courses with no users
         if len(users) == 0:
@@ -90,7 +90,7 @@ async def process_course(course: Course):
 async def notify_users(course: Course, msg: str):
     for uid in COURSE_MAP[course]:
         await bot.send_message(uid, msg, write_timeout=TIMEOUT_SECONDS)
-        db.update_user_subscription_status(uid, False)
+        db.update_subscription_status(uid, False)
     COURSES_TO_REMOVE.append(course)
 
 

@@ -60,12 +60,12 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
     user_id = str(context._user_id)
 
     if user_cache.get(IS_SUBSCRIBED) is None:
-        user_course = db.find_user_course(user_id)
+        user_course = db.get_user_course(user_id)
         user_cache[IS_SUBSCRIBED] = handle_subscription(
             user_cache, user_course)
 
     if user_cache.get(LAST_SUBSCRIBED) is None:
-        user = db.find_user(user_id)
+        user = db.get_user(user_id)
         user_cache[LAST_SUBSCRIBED] = user["last_subscribed"] if user else None
 
     return user_cache[IS_SUBSCRIBED], user_cache[LAST_SUBSCRIBED]
@@ -212,10 +212,10 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
-    db.update_db(course_name, user_id)
+    db.subscribe(course_name, user_id)
     curr_time = datetime.utcnow()
-    db.update_user_subscription_time(user_id, curr_time)
-    db.update_user_subscription_status(user_id, True)
+    db.update_subscription_time(user_id, curr_time)
+    db.update_subscription_status(user_id, True)
 
     user_cache[IS_SUBSCRIBED] = True
     user_cache[LAST_SUBSCRIBED] = curr_time
@@ -245,8 +245,8 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
-    db.remove_user(course_name, user_id)
-    db.update_user_subscription_status(user_id, False)
+    db.unsubscribe(course_name, user_id)
+    db.update_subscription_status(user_id, False)
     for key in (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION):
         user_cache.pop(key, None)
     user_cache[IS_SUBSCRIBED] = False
