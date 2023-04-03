@@ -15,9 +15,9 @@ def get_all_courses():
     return course_collection.find()
 
 
-def get_all_users():
+def get_all_subscribed_users():
     """Find all users in database and return iterable of collection objects"""
-    return user_collection.find()
+    return user_collection.find({"is_subscribed": True})
 
 
 def get_user(uid: str):
@@ -49,7 +49,7 @@ def update_subscription_time(uid: str, time: datetime):
 def update_subscription_status(uid: str, is_subscribed: bool):
     """Update user's most recent unsubscription status"""
     user_collection.update_one(
-        {"user": uid}, {"$set": {"is_subscribed": is_subscribed}})
+        {"user": uid}, {"$set": {"is_subscribed": is_subscribed}}, upsert=True)
 
 
 def subscribe(course_name: str, uid: str):

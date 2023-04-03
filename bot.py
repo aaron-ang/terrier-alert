@@ -40,19 +40,19 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 
 
 def handle_subscription(user_cache, user_course: dict[str, str] | None):
-    """Updates user cache with course information and return subscription status"""
+    """Updates user cache with course information"""
     if user_course is None:
-        return False
+        user_cache[IS_SUBSCRIBED] = False
+        return
 
     college, dep_num, section = user_course["name"].split()
     department, number = dep_num[:2], dep_num[2:]
 
+    user_cache[IS_SUBSCRIBED] = True
     user_cache[COLLEGE] = college
     user_cache[DEPARTMENT] = department
     user_cache[COURSE_NUM] = number
     user_cache[SECTION] = section
-
-    return True
 
 
 def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
@@ -61,8 +61,7 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
 
     if user_cache.get(IS_SUBSCRIBED) is None:
         user_course = db.get_user_course(user_id)
-        user_cache[IS_SUBSCRIBED] = handle_subscription(
-            user_cache, user_course)
+        handle_subscription(user_cache, user_course)
 
     if user_cache.get(LAST_SUBSCRIBED) is None:
         user = db.get_user(user_id)
