@@ -11,19 +11,20 @@ class Course:
     SEMESTER = "Fall" if 4 <= now.month < 10 else "Spring"
     YEAR = now.year + 1 if (SEMESTER == "Spring" and 10 <=
                             now.month <= 12) else now.year
-    SEM_CODE = 3 if SEMESTER == "Fall" else 4
     REFRESH_TIME_HOURS = 24
 
-    def __init__(self, full_course: str):
+    def __init__(self, full_course: str, year=YEAR, semester=SEMESTER):
         college, dep_num, section = full_course.split()
         department, number = dep_num[:2], dep_num[2:]
+        year = year + 1 if semester == "Fall" else year
+        sem_code = 3 if semester == "Fall" else 4
 
         self.college = college.upper()
         self.department = department.upper()
         self.number = number
         self.section = section.upper()
 
-        self.formatted_params = (f"&KeySem={self.YEAR}{self.SEM_CODE}&AddPlannerInd=&College={self.college}"
+        self.formatted_params = (f"&KeySem={year}{sem_code}=&College={self.college}"
                                  f"&Dept={self.department}&Course={self.number}&Section={self.section}")
 
         self.bin_url = self.bin_prefix + self.formatted_params
