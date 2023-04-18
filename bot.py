@@ -116,8 +116,6 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels and ends the conversation"""
-    for key in (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION):
-        context.user_data.pop(key, None)
     query = update.callback_query
     # handle function entries: callback or command
     if query:
