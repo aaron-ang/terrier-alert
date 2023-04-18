@@ -16,15 +16,15 @@ class Course:
     def __init__(self, full_course: str, year=YEAR, semester=SEMESTER):
         college, dep_num, section = full_course.split()
         department, number = dep_num[:2], dep_num[2:]
-        year = year + 1 if semester == "Fall" else year
-        sem_code = 3 if semester == "Fall" else 4
 
+        self.year = year + 1 if semester == "Fall" else year
+        self.sem_code = 3 if semester == "Fall" else 4
         self.college = college.upper()
         self.department = department.upper()
         self.number = number
         self.section = section.upper()
 
-        self.formatted_params = (f"&KeySem={year}{sem_code}=&College={self.college}"
+        self.formatted_params = (f"&KeySem={self.year}{self.sem_code}=&College={self.college}"
                                  f"&Dept={self.department}&Course={self.number}&Section={self.section}")
 
         self.bin_url = self.bin_prefix + self.formatted_params
