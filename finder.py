@@ -33,16 +33,12 @@ bot = telegram.Bot(token=BOT_TOKEN)
 async def search_courses():
     for course_doc in db.get_all_courses():
         users = list(course_doc["users"])
-        semester = course_doc["semester"]
         course = Course(course_doc["name"])
         # prune outdated courses and courses with no users
         if len(users) == 0:
             COURSES_TO_REMOVE.append(course)
         else:
             COURSE_MAP[course] = users
-
-        if semester != f"{Course.SEMESTER} {Course.YEAR}":
-            await notify_users(course, f"You have been unsubscribed from {course_doc['name']} since {semester} is almost over.")
 
     for course in COURSE_MAP:
         driver.get(course.bin_url)
@@ -72,6 +68,13 @@ async def process_course(course: Course):
             await notify_users(course, msg)
             return
 
+        semester = "Fall" if course.sem_code == 3 else "Spring"
+        year = course.year - 1 if semester == "Fall" else course.year
+        semester = semester + " " + str(year)
+        if semester != f"{Course.SEMESTER} {Course.YEAR}":
+            await notify_users(course, f"You have been unsubscribed from {course_name} since {semester} is almost over.")
+            return
+
         class_remark = driver.find_element(
             By.XPATH, RESULT_XPATH + "/td[13]/font").text
         if any([kw for kw in keywords if kw in class_remark]):
@@ -97,7 +100,6 @@ async def notify_users(course: Course, msg: str):
         await bot.send_message(uid, msg, write_timeout=TIMEOUT_SECONDS)
         db.update_subscription_status(uid, False)
     COURSES_TO_REMOVE.append(course)
-    COURSE_MAP.pop(course)
 
 
 async def main():
