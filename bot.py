@@ -36,19 +36,14 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
     PROMPT_MSG_ID
 ) = map(chr, range(8))
 
-"""Helper functions"""
+COURSE_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
 
-def handle_subscription(user_cache, user_course: dict[str, str] | None):
+def populate_cache(user_cache, user_course: dict[str, str] | None):
     """Updates user cache with course information"""
-    if user_course is None:
-        user_cache[IS_SUBSCRIBED] = False
-        return
-
     college, dep_num, section = user_course["name"].split()
     department, number = dep_num[:2], dep_num[2:]
 
-    user_cache[IS_SUBSCRIBED] = True
     user_cache[COLLEGE] = college
     user_cache[DEPARTMENT] = department
     user_cache[COURSE_NUM] = number
@@ -58,14 +53,19 @@ def handle_subscription(user_cache, user_course: dict[str, str] | None):
 def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
     """Check user subscription and updates cache"""
     user_id = str(context._user_id)
+    user = db.get_user(user_id)
 
-    if user_cache.get(IS_SUBSCRIBED) is None:
+    if user:
+        user_cache[IS_SUBSCRIBED] = user["is_subscribed"]
+        user_cache[LAST_SUBSCRIBED] = user["last_subscribed"]
+
+    if user_cache[IS_SUBSCRIBED] and not COURSE_FIELDS.issubset(user_cache):
         user_course = db.get_user_course(user_id)
-        handle_subscription(user_cache, user_course)
+        populate_cache(user_cache, user_course)
 
-    if user_cache.get(LAST_SUBSCRIBED) is None:
-        user = db.get_user(user_id)
-        user_cache[LAST_SUBSCRIBED] = user["last_subscribed"] if user else None
+    if not user_cache[IS_SUBSCRIBED]:
+        for key in COURSE_FIELDS:
+            user_cache.pop(key, None)
 
     return user_cache[IS_SUBSCRIBED], user_cache[LAST_SUBSCRIBED]
 
@@ -158,7 +158,7 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Check callback data and update cache for chosen college"""
     query = update.callback_query
     await query.answer()
-    
+
     user_cache = cast(dict, context.user_data)
     user_cache[COLLEGE] = query.data
 
@@ -244,7 +244,7 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(context._user_id)
     db.unsubscribe(course_name, user_id)
     db.update_subscription_status(user_id, False)
-    for key in (COLLEGE, DEPARTMENT, COURSE_NUM, SECTION):
+    for key in COURSE_FIELDS:
         user_cache.pop(key, None)
     user_cache[IS_SUBSCRIBED] = False
 
