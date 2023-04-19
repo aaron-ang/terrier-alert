@@ -24,7 +24,7 @@ def get_user_course(uid: str):
 
 def subscribe(course_name: str, uid: str):
     """Update course with new user, inserting new course if necessary"""
-    semester = f"{Course.SEMESTER} {Course.YEAR}"
+    semester = f"{Course.get_semester()} {Course.get_year()}"
     course_collection.update_one({"name": course_name, "semester": semester},
                                  {"$setOnInsert": {"semester": semester},
                                   "$push": {"users": uid}},

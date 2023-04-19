@@ -71,7 +71,7 @@ async def process_course(course: Course):
         semester = "Fall" if course.sem_code == 3 else "Spring"
         year = course.year - 1 if semester == "Fall" else course.year
         semester = semester + " " + str(year)
-        if semester != f"{Course.SEMESTER} {Course.YEAR}":
+        if semester != f"{Course.get_semester()} {Course.get_year()}":
             await notify_users(course, f"You have been unsubscribed from {course_name} since {semester} is almost over.")
             return
 

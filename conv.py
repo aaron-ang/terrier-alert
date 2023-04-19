@@ -7,7 +7,7 @@ from bot import (INPUT_COLLEGE, INPUT_DEPARTMENT, INPUT_COURSE_NUM, INPUT_SECTIO
 
 GITHUB_URL = str(os.getenv("GITHUB_URL"))
 
-WELCOME_TEXT = f"Welcome to Terrier Alert {Course.SEMESTER} {Course.YEAR}!\nUse the Menu button to get started."
+WELCOME_TEXT = f"Welcome to Terrier Alert {Course.get_semester()} {Course.get_year()}!\nUse the Menu button to get started."
 NOT_SUBSCRIBED_TEXT = "You are not subscribed to any course. Use /subscribe to start a subscription."
 UNSUBSCRIBE_TEXT = "You can only resubscribe 24 hours after your last subscription. Are you sure you want to unsubscribe?"
 HELP_TEXT = ("• Use the bot commands to interact with the app\.\n"
