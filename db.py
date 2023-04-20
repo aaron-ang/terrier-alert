@@ -10,7 +10,6 @@ mongo_client = MongoClient(MONGO_URL)
 mongo_db = mongo_client["prod_db"]
 course_collection = mongo_db["courses"]
 user_collection = mongo_db["users"]
-feedback_collection = mongo_db["feedback"]
 
 
 def get_all_courses():
@@ -40,7 +39,7 @@ def unsubscribe(course: str, uid: str):
 
 def remove_course(course: str):
     """Remove course from database"""
-    course_collection.delete_one({"name": course})
+    return course_collection.delete_one({"name": course})
 
 
 def get_all_subscribed_users():
@@ -65,10 +64,3 @@ def update_subscription_status(uid: str, is_subscribed: bool):
     return user_collection.update_one({"user": uid},
                                       {"$set": {"is_subscribed": is_subscribed}},
                                       upsert=True)
-
-
-def save_feedback(uid: str, feedback: str):
-    """Save user's feedback"""
-    return feedback_collection.insert_one({"user": uid,
-                                           "created_at": datetime.now(),
-                                           "feedback": feedback})
