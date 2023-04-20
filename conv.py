@@ -1,10 +1,12 @@
 import os
+from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
 from course import Course
 from bot import (INPUT_COLLEGE, INPUT_DEPARTMENT, INPUT_COURSE_NUM, INPUT_SECTION, SUBMIT, CANCEL,
                  COLLEGE, DEPARTMENT, COURSE_NUM, SECTION)
 
+load_dotenv()
 GITHUB_URL = str(os.getenv("GITHUB_URL"))
 
 WELCOME_TEXT = f"Welcome to Terrier Alert {Course.get_semester()} {Course.get_year()}!\nUse the Menu button to get started."
@@ -18,6 +20,9 @@ ABOUT_TEXT = ("Terrier Alert is built with *python\-telegram\-bot*, *PyMongo*, *
               f"It is open\-source\. View the source code [here]({GITHUB_URL})\.")
 UNKNOWN_CMD_TEXT = ("Sorry, I didn't understand that command. If you are currently in a subscription conversation, "
                     "please end it first,\nor use /cancel if you are stuck.")
+FEEDBACK_TEXT = "Enter and submit your feedback here. Use /cancel to abort."
+FEEDBACK_SUCCESS_TEXT = "Feedback received. Thank you!"
+FEEDBACK_FAILURE_TEXT = "Feedback failed to send. Please try again later."
 COLLEGES = ["CAS", "CDS", "COM", "ENG", "SAR", "QST"]
 FORM_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
