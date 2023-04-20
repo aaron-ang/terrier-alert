@@ -56,15 +56,15 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
     user_id = str(context._user_id)
     user = db.get_user(user_id)
 
-    if user:
-        user_cache[IS_SUBSCRIBED] = user["is_subscribed"]
-        user_cache[LAST_SUBSCRIBED] = user["last_subscribed"]
+    user_cache[IS_SUBSCRIBED] = user["is_subscribed"] if user else False
+    user_cache[LAST_SUBSCRIBED] = user["last_subscribed"] if user else None
 
-    if user_cache.get(IS_SUBSCRIBED, None) and not COURSE_FIELDS.issubset(user_cache):
+    # update cache if user is subscribed and cache is empty
+    if user_cache[IS_SUBSCRIBED] and not COURSE_FIELDS.issubset(user_cache):
         user_course = db.get_user_course(user_id)
         populate_cache(user_cache, user_course)
 
-    if not user_cache.get(IS_SUBSCRIBED, None):
+    if not user_cache[IS_SUBSCRIBED]:
         for key in COURSE_FIELDS:
             user_cache.pop(key, None)
 
@@ -256,6 +256,7 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(conv.FEEDBACK_TEXT, reply_markup=ForceReply())
     return AWAIT_FEEDBACK
 
+
 async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     feedback = update.message.text
     user_id = str(context._user_id)
@@ -264,6 +265,7 @@ async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(conv.FEEDBACK_SUCCESS_TEXT)
     else:
         await update.message.reply_text(conv.FEEDBACK_FAILURE_TEXT)
+
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_markdown_v2(conv.HELP_TEXT)
