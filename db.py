@@ -65,10 +65,3 @@ def update_subscription_status(uid: str, is_subscribed: bool):
     return user_collection.update_one({"user": uid},
                                       {"$set": {"is_subscribed": is_subscribed}},
                                       upsert=True)
-
-
-def save_feedback(uid: str, feedback: str):
-    """Save user's feedback"""
-    return feedback_collection.insert_one({"user": uid,
-                                           "created_at": datetime.now(),
-                                           "feedback": feedback})
