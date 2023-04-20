@@ -17,13 +17,14 @@ BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 (
     AWAIT_SELECTION,
     AWAIT_CUSTOM_INPUT,
+    AWAIT_FEEDBACK,
     INPUT_COLLEGE,
     INPUT_DEPARTMENT,
     INPUT_COURSE_NUM,
     INPUT_SECTION,
     SUBMIT,
     CANCEL
-) = map(chr, range(8))
+) = map(chr, range(9))
 
 (
     COLLEGE,
@@ -59,11 +60,11 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
         user_cache[IS_SUBSCRIBED] = user["is_subscribed"]
         user_cache[LAST_SUBSCRIBED] = user["last_subscribed"]
 
-    if user_cache[IS_SUBSCRIBED] and not COURSE_FIELDS.issubset(user_cache):
+    if user_cache.get(IS_SUBSCRIBED, None) and not COURSE_FIELDS.issubset(user_cache):
         user_course = db.get_user_course(user_id)
         populate_cache(user_cache, user_course)
 
-    if not user_cache[IS_SUBSCRIBED]:
+    if not user_cache.get(IS_SUBSCRIBED, None):
         for key in COURSE_FIELDS:
             user_cache.pop(key, None)
 
@@ -120,9 +121,9 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # handle function entries: callback or command
     if query:
         await query.answer()
-        await cast(Message, update.effective_message).edit_text("Transaction cancelled.")
+        await cast(Message, update.effective_message).edit_text("Transaction aborted.")
     else:
-        await context.bot.send_message(context._chat_id, "Transaction cancelled.")
+        await context.bot.send_message(context._chat_id, "Transaction aborted.")
 
     return ConversationHandler.END
 
@@ -139,7 +140,6 @@ async def handle_college_input(update: Update, context: ContextTypes.DEFAULT_TYP
 async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    await query.edit_message_reply_markup()
 
     keyword = ""
     if query.data == INPUT_DEPARTMENT:
@@ -252,6 +252,19 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(conv.FEEDBACK_TEXT, reply_markup=ForceReply())
+    return AWAIT_FEEDBACK
+
+async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    feedback = update.message.text
+    user_id = str(context._user_id)
+    if len(feedback.split()) >= 3:
+        db.save_feedback(user_id, feedback)
+        await update.message.reply_text(conv.FEEDBACK_SUCCESS_TEXT)
+    else:
+        await update.message.reply_text(conv.FEEDBACK_FAILURE_TEXT)
+
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_markdown_v2(conv.HELP_TEXT)
 
@@ -299,8 +312,18 @@ def main():
             CommandHandler("cancel", cancel)
         ],
     )
+    feedback_handler = ConversationHandler(
+        entry_points=[CommandHandler("feedback", feedback)],
+        states={
+            AWAIT_FEEDBACK: [MessageHandler(filters.REPLY, save_feedback)]
+        },
+        fallbacks=[
+            CommandHandler("cancel", cancel)
+        ],
+    )
     application.add_handler(subscription_handler)
     application.add_handler(unsubscribe_handler)
+    application.add_handler(feedback_handler)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help))
     application.add_handler(CommandHandler("about", about))
