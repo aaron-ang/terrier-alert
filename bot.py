@@ -13,6 +13,7 @@ import db
 from course import Course
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
+FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
 
 (
     AWAIT_SELECTION,
@@ -140,6 +141,7 @@ async def handle_college_input(update: Update, context: ContextTypes.DEFAULT_TYP
 async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
+    await query.edit_message_reply_markup() # handle invalid input
 
     keyword = ""
     if query.data == INPUT_DEPARTMENT:
@@ -259,12 +261,12 @@ async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     feedback = update.message.text
-    user_id = str(context._user_id)
-    if len(feedback.split()) >= 3:
-        db.save_feedback(user_id, feedback)
+    msg = await context.bot.send_message(chat_id=FEEDBACK_CHANNEL_ID, text=f"Feedback: {feedback}")
+    if msg:
         await update.message.reply_text(conv.FEEDBACK_SUCCESS_TEXT)
     else:
         await update.message.reply_text(conv.FEEDBACK_FAILURE_TEXT)
+    return ConversationHandler.END
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
