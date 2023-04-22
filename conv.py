@@ -2,9 +2,10 @@ import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
-from course import Course
 from bot import (INPUT_COLLEGE, INPUT_DEPARTMENT, INPUT_COURSE_NUM, INPUT_SECTION, SUBMIT, CANCEL,
                  COLLEGE, DEPARTMENT, COURSE_NUM, SECTION)
+from course import Course
+
 
 load_dotenv()
 GITHUB_URL = str(os.getenv("GITHUB_URL"))

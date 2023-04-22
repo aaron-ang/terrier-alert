@@ -1,5 +1,5 @@
 .env
-.vscode
-__pycache__
-tests
-admin
+.vscode/
+__pycache__/
+test/
+admin/
