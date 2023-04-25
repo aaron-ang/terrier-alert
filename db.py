@@ -42,9 +42,9 @@ def remove_course(course: str):
     return course_collection.delete_one({"name": course})
 
 
-def get_all_subscribed_users():
+def get_all_users():
     """Find all users in database and return iterable of collection objects"""
-    return user_collection.find({"is_subscribed": True})
+    return user_collection.find()
 
 
 def get_user(uid: str):
