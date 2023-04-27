@@ -8,8 +8,8 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 
-import db
 from course import Course
+import db
 
 
 options = webdriver.ChromeOptions()
@@ -115,4 +115,5 @@ async def main():
 
 
 if __name__ == "__main__":
+    print("Starting finder...")
     asyncio.run(main())

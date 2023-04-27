@@ -2,9 +2,10 @@ import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
-from course import Course
 from bot import (INPUT_COLLEGE, INPUT_DEPARTMENT, INPUT_COURSE_NUM, INPUT_SECTION, SUBMIT, CANCEL,
                  COLLEGE, DEPARTMENT, COURSE_NUM, SECTION)
+from course import Course
+
 
 load_dotenv()
 GITHUB_URL = str(os.getenv("GITHUB_URL"))
@@ -17,7 +18,7 @@ HELP_TEXT = ("• Use the bot commands to interact with the app\.\n"
              "• Each user is allowed to change their subscription once every 24 hours\.\n"
              "• Once your class is available, you will be notified and your subscription will be cleared\.")
 ABOUT_TEXT = ("Terrier Alert is built with *python\-telegram\-bot*, *PyMongo*, *Selenium WebDriver*, and *Heroku*\. "
-              f"It is open\-source\. View the source code [here]({GITHUB_URL})\.")
+              f"Check out the code [here]({GITHUB_URL})\.")
 UNKNOWN_CMD_TEXT = ("Sorry, I didn't understand that command. If you are currently in a subscription conversation, "
                     "please end it first,\nor use /cancel if you are stuck.")
 FEEDBACK_TEXT = "Enter and submit your feedback here. Use /cancel to abort."

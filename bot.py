@@ -9,8 +9,8 @@ from telegram.ext import (filters, ApplicationBuilder, CommandHandler,
                           ContextTypes, ConversationHandler, CallbackQueryHandler, MessageHandler)
 
 import conv
-import db
 from course import Course
+import db
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
@@ -24,7 +24,7 @@ FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
     INPUT_COURSE_NUM,
     INPUT_SECTION,
     SUBMIT,
-    CANCEL
+    CANCEL,
 ) = map(chr, range(9))
 
 (
@@ -35,22 +35,14 @@ FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
     IS_SUBSCRIBED,
     LAST_SUBSCRIBED,
     SUBSCRIPTION_MSG_ID,
-    PROMPT_MSG_ID
-) = map(chr, range(8))
+    PROMPT_MSG_ID,
+    INVALID_MSG_ID,
+) = map(chr, range(9))
 
 COURSE_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
 
-def populate_cache(user_cache, user_course: dict[str, str] | None):
-    """Updates user cache with course information"""
-    college, dep_num, section = user_course["name"].split()
-    department, number = dep_num[:2], dep_num[2:]
-
-    user_cache[COLLEGE] = college
-    user_cache[DEPARTMENT] = department
-    user_cache[COURSE_NUM] = number
-    user_cache[SECTION] = section
-
+# Conversation helpers
 
 def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
     """Check user subscription and updates cache"""
@@ -72,8 +64,24 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
     return user_cache[IS_SUBSCRIBED], user_cache[LAST_SUBSCRIBED]
 
 
-"""Conversation callbacks"""
+def populate_cache(user_cache: dict, user_course: dict[str, str] | None):
+    """Updates user cache with course information"""
+    college, dep_num, section = user_course["name"].split()
+    department, number = dep_num[:2], dep_num[2:]
 
+    user_cache[COLLEGE] = college
+    user_cache[DEPARTMENT] = department
+    user_cache[COURSE_NUM] = number
+    user_cache[SECTION] = section
+
+
+async def clear_invalid_msg(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
+    if INVALID_MSG_ID in user_cache:
+        await context.bot.delete_message(context._chat_id, user_cache[INVALID_MSG_ID])
+        user_cache.pop(INVALID_MSG_ID)
+
+
+# Conversation callbacks
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(conv.WELCOME_TEXT)
@@ -89,8 +97,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_subscribed:
         course_name = conv.get_course_name(user_cache)
         text = (f"*You are already subscribed to {course_name}*\!\n\n"
-                "Use /unsubscribe to remove your subscription\."
-                )
+                "Use /unsubscribe to remove your subscription\.")
         await update.message.reply_markdown_v2(text)
         return ConversationHandler.END
 
@@ -102,8 +109,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_subscribed_local = next_subscribed.astimezone(
                 ZoneInfo("America/New_York")).strftime("%b %d %I:%M%p %Z")
             text = ("*You have recently subscribed to a course*\.\n\n"
-                    f"Please wait until {next_subscribed_local} to subscribe\."
-                    )
+                    f"Please wait until {next_subscribed_local} to subscribe\.")
             await update.message.reply_markdown_v2(text)
             return ConversationHandler.END
 
@@ -119,11 +125,11 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels and ends the conversation"""
     query = update.callback_query
-    # handle function entries: callback or command
-    if query:
+    await clear_invalid_msg(context.user_data, context)
+    if query:  # callback
         await query.answer()
         await cast(Message, update.effective_message).edit_text("Transaction aborted.")
-    else:
+    else:  # command
         await context.bot.send_message(context._chat_id, "Transaction aborted.")
 
     return ConversationHandler.END
@@ -136,24 +142,6 @@ async def handle_college_input(update: Update, context: ContextTypes.DEFAULT_TYP
     buttons = conv.get_college_buttons()
     keyboard = InlineKeyboardMarkup(buttons)
     await query.edit_message_reply_markup(reply_markup=keyboard)
-
-
-async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    await query.edit_message_reply_markup() # handle invalid input
-
-    keyword = ""
-    if query.data == INPUT_DEPARTMENT:
-        keyword = "department"
-    elif query.data == INPUT_COURSE_NUM:
-        keyword = "course number"
-    elif query.data == INPUT_SECTION:
-        keyword = "section"
-
-    prompt = await context.bot.send_message(context._chat_id, f"State the {keyword}", reply_markup=ForceReply())
-    context.user_data[PROMPT_MSG_ID] = prompt.message_id
-    return AWAIT_CUSTOM_INPUT
 
 
 async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -174,13 +162,34 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return AWAIT_SELECTION
 
 
+async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_reply_markup()  # handle invalid input
+
+    user_cache = cast(dict, context.user_data)
+    await clear_invalid_msg(user_cache, context)
+
+    keyword = ""
+    if query.data == INPUT_DEPARTMENT:
+        keyword = "department"
+    elif query.data == INPUT_COURSE_NUM:
+        keyword = "course number"
+    elif query.data == INPUT_SECTION:
+        keyword = "section"
+
+    prompt = await context.bot.send_message(context._chat_id, f"State the {keyword}", reply_markup=ForceReply())
+    user_cache[PROMPT_MSG_ID] = prompt.message_id
+    return AWAIT_CUSTOM_INPUT
+
+
 async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check callback data and update cache for custom inputs"""
     message = update.message
     user_cache = cast(dict, context.user_data)
     reply = message.text.upper()
     await message.delete()
-    await context.bot.delete_message(context._chat_id, context.user_data[PROMPT_MSG_ID])
+    await context.bot.delete_message(context._chat_id, user_cache[PROMPT_MSG_ID])
 
     if re.fullmatch("^[A-Z]{2}$", reply):
         user_cache[DEPARTMENT] = reply
@@ -189,7 +198,8 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif re.fullmatch("^[A-Z]{1}[A-Z1-9]{1}$", reply):
         user_cache[SECTION] = reply
     else:
-        await message.reply_text("Invalid input. Please try again.")
+        msg = await message.reply_text("Invalid input. Please try again.")
+        user_cache[INVALID_MSG_ID] = msg.message_id
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
@@ -224,9 +234,7 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unsubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_cache = cast(dict, context.user_data)
-    is_subscribed, _ = get_subscription_status(user_cache, context)
-
+    is_subscribed, _ = get_subscription_status(context.user_data, context)
     if is_subscribed:
         buttons = conv.get_unsubscribe_buttons()
         keyboard = InlineKeyboardMarkup(buttons)
@@ -325,18 +333,19 @@ def main():
             CommandHandler("cancel", cancel)
         ],
     )
+    unknown_handler = MessageHandler(filters.COMMAND, unknown)
+
     application.add_handler(subscription_handler)
     application.add_handler(unsubscribe_handler)
     application.add_handler(feedback_handler)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help))
     application.add_handler(CommandHandler("about", about))
-
-    unknown_handler = MessageHandler(filters.COMMAND, unknown)
     application.add_handler(unknown_handler)
 
     application.run_polling()
 
 
 if __name__ == "__main__":
+    print("Starting bot...")
     main()
