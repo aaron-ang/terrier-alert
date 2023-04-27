@@ -6,6 +6,7 @@ class Course:
                    "univschr.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S")
     _reg_prefix = ("https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName="
                    "reg%2Fadd%2Fbrowse_schedule.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S")
+    _reg_option_prefix = "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName=reg/option/_start.pl"
     REFRESH_TIME_HOURS = 24
 
     @staticmethod
@@ -31,7 +32,7 @@ class Course:
         self.formatted_params = (f"&ViewSem={semester}+{year}&KeySem={self.year}{self.sem_code}&College={self.college}"
                                  f"&Dept={self.department}&Course={self.number}&Section={self.section}")
         self.bin_url = self._bin_prefix + self.formatted_params
-        self.reg_url = self._reg_prefix + self.formatted_params
+        self.reg_url = self._reg_option_prefix + self.formatted_params
 
     def __repr__(self):
         return f"{self.college} {self.department}{self.number} {self.section}"
