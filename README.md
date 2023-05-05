@@ -3,8 +3,8 @@ A Python Selenium script which scrapes BU's course portal for specific classes a
 
 Deployed to Heroku.
 
-## System Design
-![system schema](doc/terrier-alert.drawio.png)
+## System Design Overview
+![system schema](doc/terrier-alert-overview.drawio.png)
 
 ## Technical Details
 Database is a MongoDB Atlas Cluster.  
