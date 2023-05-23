@@ -2,10 +2,14 @@ from datetime import datetime
 
 
 class Course:
-    _bin_prefix = ("https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName="
-                   "univschr.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S")
-    _reg_prefix = ("https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName="
-                   "reg%2Fadd%2Fbrowse_schedule.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S")
+    _bin_prefix = (
+        "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName="
+        "univschr.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S"
+    )
+    _reg_prefix = (
+        "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName="
+        "reg%2Fadd%2Fbrowse_schedule.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S"
+    )
     _reg_option_prefix = "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName=reg/option/_start.pl"
     REFRESH_TIME_HOURS = 24
 
@@ -16,7 +20,11 @@ class Course:
     @classmethod
     def get_year(cls):
         now = datetime.now()
-        return now.year + 1 if (cls.get_semester() == "Spring" and 10 <= now.month <= 12) else now.year
+        return (
+            now.year + 1
+            if (cls.get_semester() == "Spring" and 10 <= now.month <= 12)
+            else now.year
+        )
 
     def __init__(self, full_course: str):
         college, dep_num, section = full_course.split()
@@ -29,8 +37,10 @@ class Course:
         self.department = department.upper()
         self.number = number
         self.section = section.upper()
-        self.formatted_params = (f"&ViewSem={semester}+{year}&KeySem={self.year}{self.sem_code}&College={self.college}"
-                                 f"&Dept={self.department}&Course={self.number}&Section={self.section}")
+        self.formatted_params = (
+            f"&ViewSem={semester}+{year}&KeySem={self.year}{self.sem_code}&College={self.college}"
+            f"&Dept={self.department}&Course={self.number}&Section={self.section}"
+        )
         self.bin_url = self._bin_prefix + self.formatted_params
         self.reg_url = self._reg_option_prefix + self.formatted_params
 

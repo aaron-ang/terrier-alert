@@ -14,18 +14,20 @@ import db
 
 options = webdriver.ChromeOptions()
 options.binary_location = str(os.getenv("GOOGLE_CHROME_BIN"))
-options.add_argument('--no-sandbox')
-options.add_argument('--headless')
-options.add_argument('disable-infobars')
-options.add_argument('--disable-dev-shm-usage')
+options.add_argument("--no-sandbox")
+options.add_argument("--headless")
+options.add_argument("disable-infobars")
+options.add_argument("--disable-dev-shm-usage")
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 COURSE_MAP: dict[Course, list[str]] = {}
 COURSES_TO_REMOVE: list[Course] = []
 TIMEOUT_SECONDS = 5
 
-driver = webdriver.Chrome(service=Service(executable_path=str(os.getenv("CHROMEDRIVER_PATH"))),
-                          options=options)
+driver = webdriver.Chrome(
+    service=Service(executable_path=str(os.getenv("CHROMEDRIVER_PATH"))),
+    options=options,
+)
 wait = WebDriverWait(driver, timeout=30)
 bot = telegram.Bot(token=BOT_TOKEN)
 
@@ -44,8 +46,11 @@ async def search_courses():
         driver.get(course.bin_url)
         try:
             # wait until elements are rendered
-            wait.until(EC.visibility_of_element_located(
-                (By.XPATH, "/html/body/table[4]/tbody")))
+            wait.until(
+                EC.visibility_of_element_located(
+                    (By.XPATH, "/html/body/table[4]/tbody")
+                )
+            )
             await process_course(course)
         except:
             break
@@ -54,14 +59,16 @@ async def search_courses():
 async def process_course(course: Course):
     # check for pinned message
     PINNED_XPATH = "/html/body/table[4]/tbody/tr[2]/td[1]/font/table/tbody/tr/td[1]/img"
-    RESULT_XPATH = "/html/body/table[4]/tbody/tr[3]" if driver.find_elements(
-        By.XPATH, PINNED_XPATH) else "/html/body/table[4]/tbody/tr[2]"
+    RESULT_XPATH = (
+        "/html/body/table[4]/tbody/tr[3]"
+        if driver.find_elements(By.XPATH, PINNED_XPATH)
+        else "/html/body/table[4]/tbody/tr[2]"
+    )
 
     keywords = ["Class Closed", "WebReg Restricted"]
     try:
         # check validity of class
-        course_name = driver.find_element(
-            By.XPATH, RESULT_XPATH + "/td[2]/font/a").text
+        course_name = driver.find_element(By.XPATH, RESULT_XPATH + "/td[2]/font/a").text
 
         if course_name != str(course):
             msg = f"{str(course)} is not available. Did you mean {course_name}?"
@@ -72,18 +79,19 @@ async def process_course(course: Course):
         year = course.year - 1 if semester == "Fall" else course.year
         semester = f"{semester} {year}"
         if semester != f"{Course.get_semester()} {Course.get_year()}":
-            await notify_users(course, f"You have been unsubscribed from {course_name} since {semester} is almost over.")
+            await notify_users(
+                course,
+                f"You have been unsubscribed from {course_name} since {semester} is almost over.",
+            )
             return
 
-        class_remark = driver.find_element(
-            By.XPATH, RESULT_XPATH + "/td[13]/font").text
+        class_remark = driver.find_element(By.XPATH, RESULT_XPATH + "/td[13]/font").text
         if any([kw for kw in keywords if kw in class_remark]):
             msg = f"Registration for {str(course)} is restricted. Please join the course waitlist or contact your instructor."
             await notify_users(course, msg)
             return
 
-        num_seats = driver.find_element(
-            By.XPATH, RESULT_XPATH + "/td[7]/font").text
+        num_seats = driver.find_element(By.XPATH, RESULT_XPATH + "/td[7]/font").text
         is_full = "Class Full" in class_remark
         is_avail = not is_full and int(num_seats) > 0
 

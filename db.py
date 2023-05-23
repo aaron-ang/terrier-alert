@@ -27,16 +27,16 @@ def get_user_course(uid: str):
 def subscribe(course_name: str, uid: str):
     """Update course with new user, inserting new course if necessary"""
     semester = f"{Course.get_semester()} {Course.get_year()}"
-    return course_collection.update_one({"name": course_name, "semester": semester},
-                                        {"$setOnInsert": {"semester": semester},
-                                         "$push": {"users": uid}},
-                                        upsert=True)
+    return course_collection.update_one(
+        {"name": course_name, "semester": semester},
+        {"$setOnInsert": {"semester": semester}, "$push": {"users": uid}},
+        upsert=True,
+    )
 
 
 def unsubscribe(course: str, uid: str):
     """Remove user from course"""
-    return course_collection.update_one({"name": course},
-                                        {"$pull": {"users": uid}})
+    return course_collection.update_one({"name": course}, {"$pull": {"users": uid}})
 
 
 def remove_course(course: str):
@@ -56,13 +56,13 @@ def get_user(uid: str):
 
 def update_subscription_time(uid: str, time: datetime):
     """Update user's most recent subscription time"""
-    return user_collection.update_one({"user": uid},
-                                      {"$set": {"last_subscribed": time}},
-                                      upsert=True)
+    return user_collection.update_one(
+        {"user": uid}, {"$set": {"last_subscribed": time}}, upsert=True
+    )
 
 
 def update_subscription_status(uid: str, is_subscribed: bool):
     """Update user's most recent unsubscription status"""
-    return user_collection.update_one({"user": uid},
-                                      {"$set": {"is_subscribed": is_subscribed}},
-                                      upsert=True)
+    return user_collection.update_one(
+        {"user": uid}, {"$set": {"is_subscribed": is_subscribed}}, upsert=True
+    )
