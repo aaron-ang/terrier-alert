@@ -1,4 +1,6 @@
-from datetime import datetime
+"""This module contains the Course class, which is used to represent a course at BU."""
+
+import pendulum
 
 
 class Course:
@@ -15,11 +17,11 @@ class Course:
 
     @staticmethod
     def get_semester():
-        return "Fall" if 4 <= datetime.now().month < 10 else "Spring"
+        return "Fall" if 4 <= pendulum.now().month < 10 else "Spring"
 
     @classmethod
     def get_year(cls):
-        now = datetime.now()
+        now = pendulum.now()
         return (
             now.year + 1
             if (cls.get_semester() == "Spring" and 10 <= now.month <= 12)

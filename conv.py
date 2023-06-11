@@ -1,3 +1,5 @@
+"""This module contains all the text and buttons used in the bot."""
+
 import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
@@ -18,8 +20,8 @@ from course import Course
 
 
 load_dotenv()
-GITHUB_URL = str(os.getenv("GITHUB_URL"))
 
+GITHUB_URL = str(os.getenv("GITHUB_URL"))
 WELCOME_TEXT = f"Welcome to Terrier Alert {Course.get_semester()} {Course.get_year()}!\nUse the Menu button to get started."
 NOT_SUBSCRIBED_TEXT = (
     "You are not subscribed to any course. Use /subscribe to start a subscription."

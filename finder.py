@@ -7,10 +7,17 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
+from dotenv import load_dotenv
 
 from course import Course
 import db
 
+load_dotenv()
+
+BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
+COURSE_MAP: dict[Course, list[str]] = {}
+COURSES_TO_REMOVE: list[Course] = []
+TIMEOUT_SECONDS = 5
 
 options = webdriver.ChromeOptions()
 options.binary_location = str(os.getenv("GOOGLE_CHROME_BIN"))
@@ -18,11 +25,6 @@ options.add_argument("--no-sandbox")
 options.add_argument("--headless")
 options.add_argument("disable-infobars")
 options.add_argument("--disable-dev-shm-usage")
-
-BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
-COURSE_MAP: dict[Course, list[str]] = {}
-COURSES_TO_REMOVE: list[Course] = []
-TIMEOUT_SECONDS = 5
 
 driver = webdriver.Chrome(
     service=Service(executable_path=str(os.getenv("CHROMEDRIVER_PATH"))),

@@ -1,8 +1,8 @@
 import os
 import re
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+import pendulum
 from typing import cast
+from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardMarkup, ForceReply, Message, constants
 from telegram.ext import (
     filters,
@@ -17,6 +17,8 @@ from telegram.ext import (
 import conv
 from course import Course
 import db
+
+load_dotenv()
 
 BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
@@ -50,13 +52,17 @@ COURSE_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
 # Conversation helpers
 
-def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
+def get_subscription_status(
+    user_cache: dict, context: ContextTypes.DEFAULT_TYPE
+) -> tuple[bool, pendulum.DateTime | None]:
     """Check user subscription and updates cache"""
     user_id = str(context._user_id)
     user = db.get_user(user_id)
 
     user_cache[IS_SUBSCRIBED] = user["is_subscribed"] if user else False
-    user_cache[LAST_SUBSCRIBED] = user["last_subscribed"] if user else None
+    user_cache[LAST_SUBSCRIBED] = (
+        pendulum.instance(user["last_subscribed"]) if user else None
+    )
 
     # update cache if user is subscribed and cache is empty
     if user_cache[IS_SUBSCRIBED] and not COURSE_FIELDS.issubset(user_cache):
@@ -70,7 +76,7 @@ def get_subscription_status(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
     return user_cache[IS_SUBSCRIBED], user_cache[LAST_SUBSCRIBED]
 
 
-def populate_cache(user_cache: dict, user_course: dict[str, str] | None):
+def populate_cache(user_cache: dict, user_course: dict[str, str]):
     """Updates user cache with course information"""
     college, dep_num, section = user_course["name"].split()
     department, number = dep_num[:2], dep_num[2:]
@@ -96,7 +102,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     is_subscribed, last_subscribed = get_subscription_status(user_cache, context)
-    last_subscribed = cast(datetime, last_subscribed)
 
     # Check user constraints (subscription status and time)
     if is_subscribed:
@@ -109,11 +114,10 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     if last_subscribed:
-        next_subscribed = last_subscribed + timedelta(hours=Course.REFRESH_TIME_HOURS)
-        next_subscribed = next_subscribed.replace(tzinfo=timezone.utc)
-        if datetime.now(timezone.utc) < next_subscribed:
-            next_subscribed_local = next_subscribed.astimezone(
-                ZoneInfo("America/New_York")
+        next_subscribed = last_subscribed.add(hours=Course.REFRESH_TIME_HOURS)
+        if pendulum.now() < next_subscribed:
+            next_subscribed_local = next_subscribed.in_timezone(
+                "America/New_York"
             ).strftime("%b %d %I:%M%p %Z")
             text = (
                 "*You have recently subscribed to a course*\.\n\n"
@@ -238,8 +242,8 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
+    curr_time = pendulum.now()
     db.subscribe(course_name, user_id)
-    curr_time = datetime.utcnow()
     db.update_subscription_time(user_id, curr_time)
     db.update_subscription_status(user_id, True)
 

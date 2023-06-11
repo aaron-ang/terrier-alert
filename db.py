@@ -1,11 +1,14 @@
+"""Database functions for the course subscription bot."""
+
 import os
-from datetime import datetime
+import pendulum
 from pymongo import MongoClient
 from dotenv import load_dotenv
 
 from course import Course
 
 load_dotenv()
+
 MONGO_URL = str(os.getenv("MONGO_URL"))
 
 mongo_client = MongoClient(MONGO_URL)
@@ -54,7 +57,7 @@ def get_user(uid: str):
     return user_collection.find_one({"user": uid})
 
 
-def update_subscription_time(uid: str, time: datetime):
+def update_subscription_time(uid: str, time: pendulum.DateTime):
     """Update user's most recent subscription time"""
     return user_collection.update_one(
         {"user": uid}, {"$set": {"last_subscribed": time}}, upsert=True
