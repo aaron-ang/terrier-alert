@@ -64,7 +64,7 @@ def get_subscription_status(
         pendulum.instance(user["last_subscribed"]) if user else None
     )
 
-    # update cache if user is subscribed and cache is empty
+    # Update cache if user is subscribed and cache is empty
     if user_cache[IS_SUBSCRIBED] and not COURSE_FIELDS.issubset(user_cache):
         user_course = db.get_user_course(user_id)
         populate_cache(user_cache, user_course)
