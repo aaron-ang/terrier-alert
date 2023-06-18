@@ -125,7 +125,7 @@ async def main():
             time.sleep(60)
 
         except Exception as e:
-            await notify_admin(str(e))
+            await notify_admin(repr(e))
 
 
 if __name__ == "__main__":
