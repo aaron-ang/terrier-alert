@@ -69,7 +69,7 @@ async def search_courses():
 async def process_course(course: Course):
     # Check for pinned message
     PINNED_XPATH = "/html/body/table[4]/tbody/tr[2]/td[1]/font/table/tbody/tr/td[1]/img"
-    RESULT_XPATH = f"/html/body/table[4]/tbody/tr[{'3' if driver.find_elements(By.XPATH, PINNED_XPATH) else '2'}]"
+    RESULT_XPATH = f"/html/body/table[4]/tbody/tr[{3 if driver.find_elements(By.XPATH, PINNED_XPATH) else 2}]"
     keywords = ["Class Closed", "WebReg Restricted"]
 
     # Check validity of class
@@ -80,7 +80,7 @@ async def process_course(course: Course):
         return
 
     class_remark = driver.find_element(By.XPATH, RESULT_XPATH + "/td[13]/font").text
-    if any([kw for kw in keywords if kw in class_remark]):
+    if any(filter(lambda kw: kw in class_remark, keywords)):
         msg = f"Registration for {str(course)} is restricted. Please join the course waitlist or contact your instructor."
         await notify_users_and_remove_course(course, msg)
         return
@@ -109,10 +109,13 @@ def driver_alive():
     try:
         if not driver.service.is_connectable():
             return False
+
         driver.service.assert_process_still_running()
+
+        return True
+
     except WebDriverException:
         return False
-    return True
 
 
 async def main():
@@ -120,11 +123,15 @@ async def main():
         try:
             if not driver_alive():
                 return
+
             await search_courses()
+
             while COURSES_TO_REMOVE:
                 course = COURSES_TO_REMOVE.pop()
                 db.remove_course(str(course))
+
             COURSE_MAP.clear()
+
             time.sleep(60)
 
         except Exception as e:

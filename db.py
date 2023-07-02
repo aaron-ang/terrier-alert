@@ -12,7 +12,7 @@ load_dotenv()
 MONGO_URL = str(os.getenv("MONGO_URL"))
 
 mongo_client = MongoClient(MONGO_URL)
-mongo_db = mongo_client["prod_db"]
+mongo_db = mongo_client.get_database("prod_db")
 course_collection = mongo_db["courses"]
 user_collection = mongo_db["users"]
 
