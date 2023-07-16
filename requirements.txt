@@ -1,5 +1,5 @@
 pendulum==2.1.2
-pymongo==4.3.3
-python-dotenv==0.21.1
-python-telegram-bot==20.0
-selenium==4.8.0
+pymongo==4.4.1
+python-dotenv==1.0.0
+python-telegram-bot==20.4
+selenium==4.10.0
