@@ -2,12 +2,14 @@ import os
 import time
 import asyncio
 import telegram
+import pendulum
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
+from selenium.common.exceptions import TimeoutException
 from dotenv import load_dotenv
 
 from course import Course
@@ -122,16 +124,32 @@ def driver_alive():
 
 async def main():
     """Runs the finder every minute."""
+    timeout = None
+
     while True:
         try:
             if not driver_alive():
                 return
-
             await search_courses()
-            time.sleep(60)
+
+        except TimeoutException:
+            if not timeout:
+                timeout = pendulum.now()
+            else:
+                minutes_since_last_timeout = pendulum.now().diff(timeout).in_minutes()
+                if minutes_since_last_timeout % 20 == 0:
+                    await notify_admin(
+                        f"Finder timed out for {minutes_since_last_timeout} minutes."
+                    )
 
         except Exception as e:
             await notify_admin(repr(e))
+
+        else:
+            timeout = None
+
+        finally:
+            time.sleep(60)
 
 
 if __name__ == "__main__":
