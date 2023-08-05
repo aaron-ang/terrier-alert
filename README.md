@@ -3,6 +3,9 @@ A Python Selenium script which scrapes BU's course portal for specific classes a
 
 Deployed to Heroku.
 
+## Demo
+![demo](doc/terrier-alert-demo.gif)
+
 ## System Design Overview
 ![system schema](doc/terrier-alert-overview.drawio.png)
 
