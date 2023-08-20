@@ -56,6 +56,7 @@ FORM_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
 
 def get_main_buttons(user_cache: dict):
+    """Return subscription form buttons"""
     buttons = [
         [
             InlineKeyboardButton(text="Input College", callback_data=INPUT_COLLEGE),
@@ -98,6 +99,7 @@ def get_main_buttons(user_cache: dict):
 
 
 def get_college_buttons():
+    """Return college selection buttons"""
     return [
         [
             InlineKeyboardButton(text=college, callback_data=college)
@@ -112,6 +114,7 @@ def get_college_buttons():
 
 
 def get_unsubscribe_buttons():
+    """Return unsubscribe confirmation buttons"""
     return [
         [
             InlineKeyboardButton("Yes", callback_data=SUBMIT),
@@ -126,6 +129,7 @@ def get_course_name(user_cache: dict[str, str]):
 
 
 def get_subscription_text(user_cache: dict):
+    """Format current subscription form data"""
     college = "" if not user_cache.get(COLLEGE) else user_cache[COLLEGE] + "\n"
     department = "" if not user_cache.get(DEPARTMENT) else user_cache[DEPARTMENT] + "\n"
     course_num = "" if not user_cache.get(COURSE_NUM) else user_cache[COURSE_NUM] + "\n"
@@ -137,3 +141,11 @@ def get_subscription_text(user_cache: dict):
         f"*Course:*\n{course_num}\n"
         f"*Section:*\n{section}"
     )
+
+
+def form_fields_equal(cache1: dict, cache2: dict):
+    """Check if two user caches have the same form fields"""
+    for field in FORM_FIELDS:
+        if cache1.get(field, None) != cache2.get(field, None):
+            return False
+    return True

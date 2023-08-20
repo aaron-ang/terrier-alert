@@ -1,8 +1,8 @@
 import os
 import re
-import pendulum
 from typing import cast
 from dotenv import load_dotenv
+import pendulum
 from telegram import Update, InlineKeyboardMarkup, ForceReply, Message, constants
 from telegram.ext import (
     filters,
@@ -52,10 +52,11 @@ COURSE_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
 # Conversation helpers
 
+
 def get_subscription_status(
     user_cache: dict, context: ContextTypes.DEFAULT_TYPE
 ) -> tuple[bool, pendulum.DateTime | None]:
-    """Check user subscription and updates cache"""
+    """Check user subscription and update cache"""
     user_id = str(context._user_id)
     user = db.get_user(user_id)
 
@@ -77,7 +78,7 @@ def get_subscription_status(
 
 
 def populate_cache(user_cache: dict, user_course: dict[str, str]):
-    """Updates user cache with course information"""
+    """Update user cache with course information"""
     college, dep_num, section = user_course["name"].split()
     department, number = dep_num[:2], dep_num[2:]
 
@@ -95,11 +96,14 @@ async def clear_invalid_msg(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
 
 # Conversation callbacks
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def start(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    """Handle `/start` command"""
     await update.message.reply_text(conv.WELCOME_TEXT)
 
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Starts the conversation and asks the user about their subscription"""
     user_cache = cast(dict, context.user_data)
     is_subscribed, last_subscribed = get_subscription_status(user_cache, context)
 
@@ -150,7 +154,8 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-async def handle_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def await_college_input(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    """Ask user for college input"""
     query = update.callback_query
     await query.answer()
 
@@ -179,11 +184,10 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return AWAIT_SELECTION
 
 
-async def handle_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def await_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask user for custom input"""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_reply_markup()  # handle invalid input
-
     user_cache = cast(dict, context.user_data)
     await clear_invalid_msg(user_cache, context)
 
@@ -209,6 +213,7 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply = message.text.upper()
     await message.delete()
     await context.bot.delete_message(context._chat_id, user_cache[PROMPT_MSG_ID])
+    user_cache_snapshot = user_cache.copy()
 
     if re.fullmatch("^[A-Z]{2}$", reply):
         user_cache[DEPARTMENT] = reply
@@ -220,21 +225,22 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await message.reply_text("Invalid input. Please try again.")
         user_cache[INVALID_MSG_ID] = msg.message_id
 
-    buttons = conv.get_main_buttons(user_cache)
-    keyboard = InlineKeyboardMarkup(buttons)
-    subscription_text = conv.get_subscription_text(user_cache)
-    await context.bot.edit_message_text(
-        text=subscription_text,
-        chat_id=context._chat_id,
-        message_id=user_cache[SUBSCRIPTION_MSG_ID],
-        parse_mode=constants.ParseMode.MARKDOWN_V2,
-        reply_markup=keyboard,
-    )
+    if not conv.form_fields_equal(user_cache, user_cache_snapshot):
+        buttons = conv.get_main_buttons(user_cache)
+        keyboard = InlineKeyboardMarkup(buttons)
+        subscription_text = conv.get_subscription_text(user_cache)
+        await context.bot.edit_message_text(
+            text=subscription_text,
+            chat_id=context._chat_id,
+            message_id=user_cache[SUBSCRIPTION_MSG_ID],
+            parse_mode=constants.ParseMode.MARKDOWN_V2,
+            reply_markup=keyboard,
+        )
     return AWAIT_SELECTION
 
 
 async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Submit to database"""
+    """Save subscription to database"""
     query = update.callback_query
     await query.answer()
     await query.edit_message_text("Submitting...")
@@ -257,6 +263,7 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unsubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask user for confirmation to unsubscribe"""
     is_subscribed, _ = get_subscription_status(context.user_data, context)
     if is_subscribed:
         buttons = conv.get_unsubscribe_buttons()
@@ -269,6 +276,7 @@ async def unsubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Unsubscribe user from course"""
     query = update.callback_query
     await query.answer()
 
@@ -287,12 +295,14 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-async def feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def await_feedback(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    """Ask user for feedback"""
     await update.message.reply_text(conv.FEEDBACK_TEXT, reply_markup=ForceReply())
     return AWAIT_FEEDBACK
 
 
 async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Redirect feedback to feedback channel"""
     feedback = update.message.text
     msg = await context.bot.send_message(
         chat_id=FEEDBACK_CHANNEL_ID, text=f"Feedback: {feedback}"
@@ -304,15 +314,18 @@ async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def help(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    """Handle `/help` command"""
     await update.message.reply_markdown_v2(conv.HELP_TEXT)
 
 
-async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def about(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    """Handle `/about` command"""
     await update.message.reply_markdown_v2(conv.ABOUT_TEXT)
 
 
-async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
+    """Handle unknown commands"""
     await update.message.reply_text(conv.UNKNOWN_CMD_TEXT)
 
 
@@ -320,9 +333,9 @@ def main():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
 
     selection_handlers = [
-        CallbackQueryHandler(handle_college_input, pattern=f"^" + INPUT_COLLEGE + "$"),
+        CallbackQueryHandler(await_college_input, pattern="^" + INPUT_COLLEGE + "$"),
         CallbackQueryHandler(
-            handle_custom_input,
+            await_custom_input,
             pattern=f"^({INPUT_DEPARTMENT}|{INPUT_COURSE_NUM}|{INPUT_SECTION})$",
         ),
         CallbackQueryHandler(submit, pattern="^" + SUBMIT + "$"),
@@ -353,7 +366,7 @@ def main():
         ],
     )
     feedback_handler = ConversationHandler(
-        entry_points=[CommandHandler("feedback", feedback)],
+        entry_points=[CommandHandler("feedback", await_feedback)],
         states={AWAIT_FEEDBACK: [MessageHandler(filters.REPLY, save_feedback)]},
         fallbacks=[CommandHandler("cancel", cancel)],
     )

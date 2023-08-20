@@ -142,8 +142,8 @@ async def main():
                         f"Finder timed out for {minutes_since_last_timeout} minutes."
                     )
 
-        except Exception as e:
-            await notify_admin(repr(e))
+        except Exception as exc:
+            await notify_admin(repr(exc))
 
         else:
             timeout = None
