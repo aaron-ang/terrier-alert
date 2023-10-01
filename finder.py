@@ -50,7 +50,10 @@ async def search_courses():
 
         semester = course_doc["semester"]
         if semester != f"{Course.get_semester()} {Course.get_year()}":
-            msg = f"You have been unsubscribed from {course} since {semester} is almost over."
+            msg = (
+                f"You have been unsubscribed from {course} "
+                f"since the deadline to add courses for {semester} has passed."
+            )
             await notify_users_and_unsubscribe(course, msg, users)
             continue
 
