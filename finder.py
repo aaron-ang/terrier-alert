@@ -82,11 +82,11 @@ async def process_course(course: Course, users: list[str]):
 
     class_remark = driver.find_element(By.XPATH, result_xpath + "/td[13]/font").text
     if any(filter(lambda kw: kw in class_remark, keywords)):
-        msg = (
-            f"Registration for {str(course)} is restricted. "
-            "Please join the course waitlist or contact your instructor."
-        )
-        await notify_users_and_unsubscribe(course, msg, users)
+        # msg = (
+        #     f"Registration for {str(course)} is restricted. "
+        #     "Please join the course waitlist or contact your instructor."
+        # )
+        # await notify_users_and_unsubscribe(course, msg, users)
         return
 
     num_seats = driver.find_element(By.XPATH, result_xpath + "/td[7]/font").text
