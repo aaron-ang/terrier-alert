@@ -75,7 +75,7 @@ async def process_course(course: Course, users: list[str]):
     # Check validity of course
     course_name = driver.find_element(By.XPATH, result_xpath + "/td[2]/font/a").text
     if course_name != str(course):
-        msg = f"{str(course)} is not available. Did you mean {course_name}?"
+        msg = f"{str(course)} was not found in the University Class Schedule. Did you mean {course_name}?"
         await notify_users_and_unsubscribe(course, msg, users)
         return
 
