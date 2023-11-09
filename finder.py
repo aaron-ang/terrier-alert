@@ -71,31 +71,52 @@ async def process_course(course: Course, users: list[str]):
     pinned_xpath = "/html/body/table[4]/tbody/tr[2]/td[1]/font/table/tbody/tr/td[1]/img"
     result_row_index = 3 if driver.find_elements(By.XPATH, pinned_xpath) else 2
     result_xpath = f"/html/body/table[4]/tbody/tr[{result_row_index}]"
-    keywords = ["Class Closed", "WebReg Restricted"]
 
-    # Check validity of class
+    # Check validity of course
     course_name = driver.find_element(By.XPATH, result_xpath + "/td[2]/font/a").text
     if course_name != str(course):
         msg = f"{str(course)} is not available. Did you mean {course_name}?"
         await notify_users_and_unsubscribe(course, msg, users)
         return
 
-    class_remark = driver.find_element(By.XPATH, result_xpath + "/td[13]/font").text
-    if any(filter(lambda kw: kw in class_remark, keywords)):
-        # msg = (
-        #     f"Registration for {str(course)} is restricted. "
-        #     "Please join the course waitlist or contact your instructor."
-        # )
-        # await notify_users_and_unsubscribe(course, msg, users)
-        return
-
-    num_seats = driver.find_element(By.XPATH, result_xpath + "/td[7]/font").text
-    is_full = "Class Full" in class_remark
-    is_avail = not is_full and int(num_seats) > 0
-
-    if is_avail:
+    if course_available(result_xpath, course_name):
         msg = f"{str(course)} is now available at {course.reg_url}"
         await notify_users_and_unsubscribe(course, msg, users)
+
+
+def course_available(result_xpath: str, course_name: str):
+    keywords = ["Class Closed", "WebReg Restricted"]
+    course_remark = driver.find_element(By.XPATH, result_xpath + "/td[13]/font").text
+
+    # Edge case: lecture not flagged but discussion is
+    next_course_xpath = get_next_course_xpath(result_xpath)
+    next_course_name = driver.find_element(
+        By.XPATH, next_course_xpath + "/td[2]/font/a"
+    ).text
+    if next_course_name.split()[0] == course_name.split()[0]:
+        next_course_remark = driver.find_element(
+            By.XPATH, next_course_xpath + "/td[13]/font"
+        ).text
+        course_remark += f" {next_course_remark}"
+
+    if any(filter(lambda kw: kw in course_remark, keywords)):
+        return False
+
+    num_seats = driver.find_element(By.XPATH, result_xpath + "/td[7]/font").text
+    is_full = "Class Full" in course_remark
+    is_avail = not is_full and int(num_seats) > 0
+    return is_avail
+
+
+def get_next_course_xpath(result_xpath: str):
+    row_index = int(result_xpath.split("[")[-1].split("]")[0])
+    result_xpath = result_xpath.replace(f"/tr[{row_index}]", f"/tr[{row_index + 1}]")
+    while not driver.find_element(By.XPATH, result_xpath + "/td[2]/font/a").text:
+        result_xpath = result_xpath.replace(
+            f"/tr[{row_index}]", f"/tr[{row_index + 1}]"
+        )
+        row_index += 1
+    return result_xpath
 
 
 async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str]):
