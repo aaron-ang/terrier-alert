@@ -2,70 +2,89 @@
 
 import os
 import pendulum
-from pymongo import MongoClient
 from dotenv import load_dotenv
+from pymongo import MongoClient
+import certifi
 
 from course import Course
 
 load_dotenv()
 
-MONGO_URL = str(os.getenv("MONGO_URL"))
-
-mongo_client = MongoClient(MONGO_URL)
-mongo_db = mongo_client.get_database("prod_db")
-course_collection = mongo_db["courses"]
-user_collection = mongo_db["users"]
-
-
-def get_all_courses():
-    """Find all active courses in database and return iterable of collection objects"""
-    return course_collection.find()
+UID = "user"
+USER_LIST = "users"
+COURSE_NAME = "name"
+SEM_YEAR = "semester"
+IS_SUBSCRIBED = "is_subscribed"
+LAST_SUBSCRIBED = "last_subscribed"
+LAST_SUBSCRIPTION = "last_subscription"
 
 
-def get_user_course(uid: str):
-    """Find course which user is subscribed to and return the collection object (dict)"""
-    return course_collection.find_one({"users": uid})
+class Database:
+    def __init__(self, env):
+        MONGO_URL = str(os.getenv("MONGO_URL"))
+        mongo_client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
+        mongo_db = mongo_client.get_database(f"{env}_db")
+        self.course_collection = mongo_db["courses"]
+        self.user_collection = mongo_db["users"]
+        self.env = env
 
+    def get_all_courses(self):
+        """Find all active courses in database and return iterable of collection objects"""
+        return self.course_collection.find()
 
-def subscribe(course_name: str, uid: str):
-    """Update course with new user, inserting new course if necessary"""
-    semester = f"{Course.get_semester()} {Course.get_year()}"
-    return course_collection.update_one(
-        {"name": course_name, "semester": semester},
-        {"$setOnInsert": {"semester": semester}, "$push": {"users": uid}},
-        upsert=True,
-    )
+    def get_user_course(self, uid: str):
+        """Find course which user is subscribed to and return the collection object (dict)"""
+        return self.course_collection.find_one({USER_LIST: uid})
 
+    def subscribe(
+        self, course_name: str, uid: str, subscription_time: pendulum.DateTime
+    ):
+        """Update course with new user, inserting new course if necessary"""
+        sem_year = Course.get_sem_year()
+        self.course_collection.update_one(
+            {COURSE_NAME: course_name, SEM_YEAR: sem_year},
+            {"$setOnInsert": {SEM_YEAR: sem_year}, "$push": {USER_LIST: uid}},
+            upsert=True,
+        )
+        self.update_subscription_time(uid, subscription_time)
+        self.update_subscription_status(uid, course_name, True)
 
-def unsubscribe(course: str, uid: str):
-    """Remove user from course"""
-    return course_collection.update_one({"name": course}, {"$pull": {"users": uid}})
+    def unsubscribe(self, course_name: str, uid: str):
+        """Remove user from course"""
+        self.course_collection.update_one(
+            {COURSE_NAME: course_name}, {"$pull": {USER_LIST: uid}}
+        )
+        self.update_subscription_status(uid, course_name, False)
 
+    def remove_course(self, course_name: str):
+        """Remove course from database"""
+        return self.course_collection.delete_one({COURSE_NAME: course_name})
 
-def remove_course(course: str):
-    """Remove course from database"""
-    return course_collection.delete_one({"name": course})
+    def get_all_users(self):
+        """Find all users in database and return iterable of collection objects"""
+        return self.user_collection.find()
 
+    def get_user(self, uid: str):
+        """Find user in database and return collection object (dict)"""
+        return self.user_collection.find_one({UID: uid})
 
-def get_all_users():
-    """Find all users in database and return iterable of collection objects"""
-    return user_collection.find()
+    def update_subscription_time(self, uid: str, time: pendulum.DateTime):
+        """Update user's most recent subscription time"""
+        return self.user_collection.update_one(
+            {UID: uid}, {"$set": {LAST_SUBSCRIBED: time}}, upsert=True
+        )
 
-
-def get_user(uid: str):
-    """Find user in database and return collection object (dict)"""
-    return user_collection.find_one({"user": uid})
-
-
-def update_subscription_time(uid: str, time: pendulum.DateTime):
-    """Update user's most recent subscription time"""
-    return user_collection.update_one(
-        {"user": uid}, {"$set": {"last_subscribed": time}}, upsert=True
-    )
-
-
-def update_subscription_status(uid: str, is_subscribed: bool):
-    """Update user's most recent unsubscription status"""
-    return user_collection.update_one(
-        {"user": uid}, {"$set": {"is_subscribed": is_subscribed}}, upsert=True
-    )
+    def update_subscription_status(
+        self, uid: str, course_name: str, is_subscribed: bool
+    ):
+        """Update user's most recent unsubscription status"""
+        return self.user_collection.update_one(
+            {UID: uid},
+            {
+                "$set": {
+                    IS_SUBSCRIBED: is_subscribed,
+                    LAST_SUBSCRIPTION: course_name,
+                }
+            },
+            upsert=True,
+        )

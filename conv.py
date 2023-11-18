@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
-from bot import (
+from constants import (
     INPUT_COLLEGE,
     INPUT_DEPARTMENT,
     INPUT_COURSE_NUM,
@@ -15,6 +15,7 @@ from bot import (
     DEPARTMENT,
     COURSE_NUM,
     SECTION,
+    FORM_FIELDS,
 )
 from course import Course
 
@@ -23,7 +24,7 @@ load_dotenv()
 
 GITHUB_URL = str(os.getenv("GITHUB_URL"))
 WELCOME_TEXT = (
-    f"Welcome to Terrier Alert {Course.get_semester()} {Course.get_year()}!\n"
+    f"Welcome to Terrier Alert {Course.get_sem_year()}!\n"
     "Use the Menu button to get started."
 )
 NOT_SUBSCRIBED_TEXT = (
@@ -51,8 +52,7 @@ UNKNOWN_CMD_TEXT = (
 FEEDBACK_TEXT = "Enter and submit your feedback here. Use /cancel to abort."
 FEEDBACK_SUCCESS_TEXT = "Feedback received. Thank you!"
 FEEDBACK_FAILURE_TEXT = "Feedback failed to send. Please try again later."
-COLLEGES = ["CAS", "CDS", "COM", "ENG", "SAR", "QST"]
-FORM_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
+COLLEGES = ["CAS", "CDS", "COM", "ENG", "SAR", "QST", "CGS", "SPH", "SED", "PDP"]
 
 
 def get_main_buttons(user_cache: dict):
@@ -93,28 +93,27 @@ def get_main_buttons(user_cache: dict):
             )
 
     if FORM_FIELDS.issubset(user_cache):
-        buttons.insert(2, [InlineKeyboardButton(text="Submit", callback_data=SUBMIT)])
+        buttons.insert(-1, [InlineKeyboardButton(text="Submit", callback_data=SUBMIT)])
 
     return buttons
 
 
 def get_college_buttons():
     """Return college selection buttons"""
-    return [
-        [
-            InlineKeyboardButton(text=college, callback_data=college)
-            for college in COLLEGES[:3]
-        ],
-        [
-            InlineKeyboardButton(text=college, callback_data=college)
-            for college in COLLEGES[3:]
-        ],
-        [InlineKeyboardButton(text="PDP", callback_data="PDP")],
-    ]
+    cols = 3
+    rows = []
+    for i in range(0, len(COLLEGES), cols):
+        rows.append(
+            [
+                InlineKeyboardButton(text=college, callback_data=college)
+                for college in COLLEGES[i : i + cols]
+            ]
+        )
+    return rows
 
 
-def get_unsubscribe_buttons():
-    """Return unsubscribe confirmation buttons"""
+def get_confirmation_buttons():
+    """Return confirmation buttons"""
     return [
         [
             InlineKeyboardButton("Yes", callback_data=SUBMIT),

@@ -13,25 +13,22 @@ class Course:
         "reg%2Fadd%2Fbrowse_schedule.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S"
     )
     _reg_option_prefix = "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1?ModuleName=reg/option/_start.pl"
-    REFRESH_TIME_HOURS = 24
 
     @staticmethod
-    def get_semester():
-        return "Fall" if 4 <= pendulum.now().month < 10 else "Spring"
-
-    @classmethod
-    def get_year(cls):
+    def get_sem_year():
         now = pendulum.now()
-        return (
+        semester = "Fall" if 4 <= now.month < 10 else "Spring"
+        year = (
             now.year + 1
-            if (cls.get_semester() == "Spring" and 10 <= now.month <= 12)
+            if (semester == "Spring" and 10 <= now.month <= 12)
             else now.year
         )
+        return f"{semester} {year}"
 
-    def __init__(self, full_course: str):
-        college, dep_num, section = full_course.split()
+    def __init__(self, course_name: str):
+        college, dep_num, section = course_name.split()
         department, number = dep_num[:2], dep_num[2:]
-        year, semester = self.get_year(), self.get_semester()
+        semester, year = self.get_sem_year().split()
 
         self.year = year + 1 if semester == "Fall" else year
         self.sem_code = 3 if semester == "Fall" else 4

@@ -14,40 +14,13 @@ from telegram.ext import (
     MessageHandler,
 )
 
+from constants import *
 import conv
-from course import Course
-import db
+from db import Database
 
 load_dotenv()
 
-BOT_TOKEN = str(os.getenv("TELEGRAM_TOKEN"))
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
-
-(
-    AWAIT_SELECTION,
-    AWAIT_CUSTOM_INPUT,
-    AWAIT_FEEDBACK,
-    INPUT_COLLEGE,
-    INPUT_DEPARTMENT,
-    INPUT_COURSE_NUM,
-    INPUT_SECTION,
-    SUBMIT,
-    CANCEL,
-) = map(chr, range(9))
-
-(
-    COLLEGE,
-    DEPARTMENT,
-    COURSE_NUM,
-    SECTION,
-    IS_SUBSCRIBED,
-    LAST_SUBSCRIBED,
-    SUBSCRIPTION_MSG_ID,
-    PROMPT_MSG_ID,
-    INVALID_MSG_ID,
-) = map(chr, range(9))
-
-COURSE_FIELDS = {COLLEGE, DEPARTMENT, COURSE_NUM, SECTION}
 
 
 # Conversation helpers
@@ -58,21 +31,20 @@ def get_subscription_status(
 ) -> tuple[bool, pendulum.DateTime | None]:
     """Check user subscription and update cache"""
     user_id = str(context._user_id)
-    user = db.get_user(user_id)
+    user = DB.get_user(user_id)
 
     user_cache[IS_SUBSCRIBED] = user["is_subscribed"] if user else False
     user_cache[LAST_SUBSCRIBED] = (
         pendulum.instance(user["last_subscribed"]) if user else None
     )
-
-    # Update cache if user is subscribed and cache is empty
-    if user_cache[IS_SUBSCRIBED] and not COURSE_FIELDS.issubset(user_cache):
-        user_course = db.get_user_course(user_id)
-        populate_cache(user_cache, user_course)
+    user_cache[LAST_SUBSCRIPTION] = user["last_subscription"] if user else ""
 
     if not user_cache[IS_SUBSCRIBED]:
-        for key in COURSE_FIELDS:
+        for key in FORM_FIELDS:
             user_cache.pop(key, None)
+    elif not FORM_FIELDS.issubset(user_cache):
+        user_course = DB.get_user_course(user_id)
+        populate_cache(user_cache, user_course)
 
     return user_cache[IS_SUBSCRIBED], user_cache[LAST_SUBSCRIBED]
 
@@ -117,8 +89,8 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_markdown_v2(text)
         return ConversationHandler.END
 
-    if last_subscribed:
-        next_subscribed = last_subscribed.add(hours=Course.REFRESH_TIME_HOURS)
+    if DB.env == PROD and last_subscribed:
+        next_subscribed = last_subscribed.add(hours=REFRESH_TIME_HOURS)
         if pendulum.now() < next_subscribed:
             next_subscribed_local = next_subscribed.in_timezone(
                 "America/New_York"
@@ -180,7 +152,6 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode=constants.ParseMode.MARKDOWN_V2,
         reply_markup=keyboard,
     )
-
     return AWAIT_SELECTION
 
 
@@ -249,16 +220,55 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
     curr_time = pendulum.now()
-    db.subscribe(course_name, user_id)
-    db.update_subscription_time(user_id, curr_time)
-    db.update_subscription_status(user_id, True)
 
+    DB.subscribe(course_name, user_id, curr_time)
     user_cache[IS_SUBSCRIBED] = True
     user_cache[LAST_SUBSCRIBED] = curr_time
     await cast(Message, update.effective_message).reply_text(
         f"You are now subscribed to {course_name}."
     )
+    return ConversationHandler.END
 
+
+async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask user for confirmation to resubscribe"""
+    user_cache = cast(dict, context.user_data)
+    is_subscribed, _ = get_subscription_status(user_cache, context)
+    if is_subscribed:
+        text = (
+            f"*You are already subscribed to {conv.get_course_name(user_cache)}*\!\n\n"
+            "Use /unsubscribe to remove your subscription\."
+        )
+        await update.message.reply_markdown_v2(text)
+        return ConversationHandler.END
+
+    if not user_cache[LAST_SUBSCRIPTION]:
+        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT)
+        return ConversationHandler.END
+
+    buttons = conv.get_confirmation_buttons()
+    keyboard = InlineKeyboardMarkup(buttons)
+    text = f"Confirm resubscription to {user_cache[LAST_SUBSCRIPTION]}?"
+    await update.message.reply_text(text, reply_markup=keyboard)
+    return AWAIT_CUSTOM_INPUT
+
+
+async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Resubscribe user to course"""
+    query = update.callback_query
+    await query.answer()
+
+    user_cache = cast(dict, context.user_data)
+    course_name = user_cache[LAST_SUBSCRIPTION]
+    user_id = str(context._user_id)
+    curr_time = pendulum.now()
+
+    DB.subscribe(course_name, user_id, curr_time)
+    user_cache[IS_SUBSCRIBED] = True
+    user_cache[LAST_SUBSCRIBED] = curr_time
+    await cast(Message, update.effective_message).edit_text(
+        f"Successfully resubscribed to {course_name}."
+    )
     return ConversationHandler.END
 
 
@@ -266,7 +276,7 @@ async def unsubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Ask user for confirmation to unsubscribe"""
     is_subscribed, _ = get_subscription_status(context.user_data, context)
     if is_subscribed:
-        buttons = conv.get_unsubscribe_buttons()
+        buttons = conv.get_confirmation_buttons()
         keyboard = InlineKeyboardMarkup(buttons)
         await update.message.reply_text(conv.UNSUBSCRIBE_TEXT, reply_markup=keyboard)
         return AWAIT_SELECTION
@@ -283,9 +293,9 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
-    db.unsubscribe(course_name, user_id)
-    db.update_subscription_status(user_id, False)
-    for key in COURSE_FIELDS:
+
+    DB.unsubscribe(course_name, user_id)
+    for key in FORM_FIELDS:
         user_cache.pop(key, None)
     user_cache[IS_SUBSCRIBED] = False
 
@@ -329,8 +339,13 @@ async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(conv.UNKNOWN_CMD_TEXT)
 
 
-def main():
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+def main(env=PROD):
+    print("Starting bot...")
+    global DB
+
+    DB = Database(env)
+    bot_token = str(os.getenv(f"{'TEST_' if env == DEV else ''}TELEGRAM_TOKEN"))
+    application = ApplicationBuilder().token(bot_token).build()
 
     selection_handlers = [
         CallbackQueryHandler(await_college_input, pattern="^" + INPUT_COLLEGE + "$"),
@@ -349,6 +364,18 @@ def main():
         },
         fallbacks=[
             CallbackQueryHandler(save_college_input, pattern="^[A-Z]{3}$"),
+            CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
+            CommandHandler("cancel", cancel),
+        ],
+    )
+    resubscription_handler = ConversationHandler(
+        entry_points=[CommandHandler("resubscribe", resubscribe_dialog)],
+        states={
+            AWAIT_CUSTOM_INPUT: [
+                CallbackQueryHandler(resubscribe, pattern="^" + SUBMIT + "$")
+            ],
+        },
+        fallbacks=[
             CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
             CommandHandler("cancel", cancel),
         ],
@@ -373,6 +400,7 @@ def main():
     unknown_handler = MessageHandler(filters.COMMAND, unknown)
 
     application.add_handler(subscription_handler)
+    application.add_handler(resubscription_handler)
     application.add_handler(unsubscribe_handler)
     application.add_handler(feedback_handler)
     application.add_handler(CommandHandler("start", start))
@@ -384,5 +412,4 @@ def main():
 
 
 if __name__ == "__main__":
-    print("Starting bot...")
     main()
