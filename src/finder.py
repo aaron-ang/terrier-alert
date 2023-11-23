@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import asyncio
 import telegram
@@ -12,9 +13,10 @@ from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import WebDriverException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
-from constants import DEV, PROD, TIMEOUT_SECONDS
-from course import Course
-from db import Database
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.constants import DEV, PROD, TIMEOUT_SECONDS
+from utils.course import Course
+from utils.db import Database
 
 load_dotenv()
 

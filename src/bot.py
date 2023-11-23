@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 from typing import cast
 from dotenv import load_dotenv
@@ -14,9 +15,10 @@ from telegram.ext import (
     MessageHandler,
 )
 
-from constants import *
-import conv
-from db import Database
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.constants import *
+from utils import conv
+from utils.db import Database
 
 load_dotenv()
 

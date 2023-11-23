@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
-from constants import (
+from utils.constants import (
     INPUT_COLLEGE,
     INPUT_DEPARTMENT,
     INPUT_COURSE_NUM,
@@ -17,7 +17,7 @@ from constants import (
     SECTION,
     FORM_FIELDS,
 )
-from course import Course
+from utils.course import Course
 
 
 load_dotenv()

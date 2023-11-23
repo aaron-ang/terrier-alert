@@ -3,8 +3,8 @@ import sys
 import logging
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import bot
-from bot import DEV
+from src import bot
+from src.bot import DEV
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
