@@ -1,10 +1,12 @@
 import os
 import sys
 import re
+import html
+import traceback
 from typing import cast
 from dotenv import load_dotenv
 import pendulum
-from telegram import Update, InlineKeyboardMarkup, ForceReply, Message, constants
+from telegram import Update, InlineKeyboardMarkup, ForceReply, Message, constants, error
 from telegram.ext import (
     filters,
     ApplicationBuilder,
@@ -341,6 +343,26 @@ async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(conv.UNKNOWN_CMD_TEXT)
 
 
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+    """Send an error notification to Telegram feedback channel."""
+    tb_list = traceback.format_exception(
+        None, context.error, context.error.__traceback__
+    )
+    tb_string = "".join(tb_list)
+    message = (
+        "An exception was raised while handling an update\n"
+        f"<pre>{html.escape(tb_string)}</pre>"
+    )
+    if isinstance(context.error, error.Conflict):
+        print(message)
+    else:
+        await context.bot.send_message(
+            chat_id=FEEDBACK_CHANNEL_ID,
+            text=message,
+            parse_mode=constants.ParseMode.HTML,
+        )
+
+
 def main(env=PROD):
     print("Starting bot...")
     global DB
@@ -409,6 +431,7 @@ def main(env=PROD):
     application.add_handler(CommandHandler("help", help))
     application.add_handler(CommandHandler("about", about))
     application.add_handler(unknown_handler)
+    application.add_error_handler(error_handler)
 
     application.run_polling()
 
