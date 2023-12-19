@@ -22,7 +22,7 @@ from utils.course import Course
 
 load_dotenv()
 
-GITHUB_URL = str(os.getenv("GITHUB_URL"))
+GITHUB_URL = os.getenv("GITHUB_URL")
 WELCOME_TEXT = (
     f"Welcome to Terrier Alert {Course.get_sem_year()}!\n"
     "Use the Menu button to get started."

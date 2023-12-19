@@ -133,30 +133,31 @@ async def main(env=PROD):
     print("Starting finder...")
     global BOT, DB, DRIVER, WAIT
 
-    bot_token = str(os.getenv(f"{'TEST_' if env == DEV else ''}TELEGRAM_TOKEN"))
+    bot_token = os.getenv("TELEGRAM_TOKEN" if env == PROD else "TEST_TELEGRAM_TOKEN")
     BOT = telegram.Bot(token=bot_token)
     DB = Database(env)
-    if env == PROD:
-        options = webdriver.ChromeOptions()
-        options.binary_location = str(os.getenv("GOOGLE_CHROME_BIN"))
-        options.add_argument("--no-sandbox")
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--start-maximized")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        options.add_experimental_option("useAutomationExtension", False)
-        DRIVER = webdriver.Chrome(
-            service=Service(executable_path=os.getenv("CHROMEDRIVER_PATH")),
-            options=options,
-        )
-    else:
-        DRIVER = webdriver.Chrome(
-            service=Service(executable_path=ChromeDriverManager().install())
-        )
-    WAIT = WebDriverWait(DRIVER, timeout=30)
-    timeout = None
 
+    options = webdriver.ChromeOptions()
+    if bin_path := os.getenv("GOOGLE_CHROME_BIN"):
+        options.binary_location = bin_path
+        options.add_argument("--start-maximized")
+        options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option("useAutomationExtension", False)
+    DRIVER = webdriver.Chrome(
+        service=Service(
+            executable_path=os.getenv("CHROMEDRIVER_PATH")
+            if env == PROD
+            else ChromeDriverManager().install()
+        ),
+        options=options,
+    )
+    WAIT = WebDriverWait(DRIVER, timeout=30)
+
+    timeout = None
     while True:
         try:
             if not driver_alive():

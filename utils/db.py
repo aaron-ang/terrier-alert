@@ -21,7 +21,7 @@ LAST_SUBSCRIPTION = "last_subscription"
 
 class Database:
     def __init__(self, env):
-        MONGO_URL = str(os.getenv("MONGO_URL"))
+        MONGO_URL = os.getenv("MONGO_URL")
         mongo_client = MongoClient(MONGO_URL, tlsCAFile=certifi.where())
         mongo_db = mongo_client.get_database(f"{env}_db")
         self.course_collection = mongo_db["courses"]

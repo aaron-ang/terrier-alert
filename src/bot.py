@@ -368,7 +368,7 @@ def main(env=PROD):
     global DB
 
     DB = Database(env)
-    bot_token = str(os.getenv(f"{'TEST_' if env == DEV else ''}TELEGRAM_TOKEN"))
+    bot_token = os.getenv("TELEGRAM_TOKEN" if env == PROD else "TEST_TELEGRAM_TOKEN")
     application = ApplicationBuilder().token(bot_token).build()
 
     selection_handlers = [
