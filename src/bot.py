@@ -75,7 +75,7 @@ async def clear_invalid_msg(user_cache: dict, context: ContextTypes.DEFAULT_TYPE
 
 async def start(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/start` command"""
-    await update.message.reply_text(conv.WELCOME_TEXT)
+    await update.message.reply_text(conv.WELCOME_TEXT, quote=True)
 
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -90,7 +90,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"*You are already subscribed to {course_name}*\!\n\n"
             "Use /unsubscribe to remove your subscription\."
         )
-        await update.message.reply_markdown_v2(text)
+        await update.message.reply_markdown_v2(text, quote=True)
         return ConversationHandler.END
 
     if DB.env == PROD and last_subscribed:
@@ -103,14 +103,14 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "*You have recently subscribed to a course*\.\n\n"
                 f"Please wait until {next_subscribed_local} to subscribe\."
             )
-            await update.message.reply_markdown_v2(text)
+            await update.message.reply_markdown_v2(text, quote=True)
             return ConversationHandler.END
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
     subscription_text = conv.get_subscription_text(user_cache)
     conv_message = await update.message.reply_markdown_v2(
-        subscription_text, reply_markup=keyboard
+        subscription_text, quote=True, reply_markup=keyboard
     )
     user_cache[SUBSCRIPTION_MSG_ID] = conv_message.message_id
 
@@ -243,17 +243,17 @@ async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"*You are already subscribed to {conv.get_course_name(user_cache)}*\!\n\n"
             "Use /unsubscribe to remove your subscription\."
         )
-        await update.message.reply_markdown_v2(text)
+        await update.message.reply_markdown_v2(text, quote=True)
         return ConversationHandler.END
 
     if not user_cache[LAST_SUBSCRIPTION]:
-        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT)
+        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
         return ConversationHandler.END
 
     buttons = conv.get_confirmation_buttons()
     keyboard = InlineKeyboardMarkup(buttons)
     text = f"Confirm resubscription to {user_cache[LAST_SUBSCRIPTION]}?"
-    await update.message.reply_text(text, reply_markup=keyboard)
+    await update.message.reply_text(text, quote=True, reply_markup=keyboard)
     return AWAIT_CUSTOM_INPUT
 
 
@@ -282,10 +282,12 @@ async def unsubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if is_subscribed:
         buttons = conv.get_confirmation_buttons()
         keyboard = InlineKeyboardMarkup(buttons)
-        await update.message.reply_text(conv.UNSUBSCRIBE_TEXT, reply_markup=keyboard)
+        await update.message.reply_text(
+            conv.UNSUBSCRIBE_TEXT, quote=True, reply_markup=keyboard
+        )
         return AWAIT_SELECTION
     else:
-        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT)
+        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
         return ConversationHandler.END
 
 
@@ -311,7 +313,9 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def await_feedback(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Ask user for feedback"""
-    await update.message.reply_text(conv.FEEDBACK_TEXT, reply_markup=ForceReply())
+    await update.message.reply_text(
+        conv.FEEDBACK_TEXT, quote=True, reply_markup=ForceReply()
+    )
     return AWAIT_FEEDBACK
 
 
@@ -330,17 +334,17 @@ async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/help` command"""
-    await update.message.reply_markdown_v2(conv.HELP_TEXT)
+    await update.message.reply_markdown_v2(conv.HELP_TEXT, quote=True)
 
 
 async def about(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/about` command"""
-    await update.message.reply_markdown_v2(conv.ABOUT_TEXT)
+    await update.message.reply_markdown_v2(conv.ABOUT_TEXT, quote=True)
 
 
 async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle unknown commands"""
-    await update.message.reply_text(conv.UNKNOWN_CMD_TEXT)
+    await update.message.reply_text(conv.UNKNOWN_CMD_TEXT, quote=True)
 
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
