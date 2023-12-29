@@ -29,7 +29,7 @@ async def search_courses():
         course = Course(course_doc["name"])
         users = list(course_doc["users"])
         if len(users) == 0:  # prune courses with no users
-            DB.remove_course(str(course))
+            DB.remove_course(course.get_course_name())
             continue
 
         semester = course_doc["semester"]
@@ -57,14 +57,14 @@ async def process_course(course: Course, users: list[str]):
     result_xpath = f"/html/body/table[4]/tbody/tr[{result_row_index}]"
 
     # Check validity of course
-    course_name = DRIVER.find_element(By.XPATH, result_xpath + "/td[2]/font/a").text
-    if course_name != str(course):
-        msg = f"{str(course)} was not found in the University Class Schedule. Did you mean {course_name}?"
+    course_name_web = DRIVER.find_element(By.XPATH, result_xpath + "/td[2]/font/a").text
+    course_name_db = course.get_course_name()
+    if course_name_db != course_name_web:
+        msg = f"{course_name_db} was not found in the University Class Schedule. Did you mean {course_name_web}?"
         await notify_users_and_unsubscribe(course, msg, users)
         return
-
-    if course_available(result_xpath, course_name):
-        msg = f"{str(course)} is now available at {course.reg_url}"
+    if course_available(result_xpath, course_name_db):
+        msg = f"{course_name_db} is now available at {course.reg_url}"
         await notify_users_and_unsubscribe(course, msg, users)
 
 
@@ -81,9 +81,10 @@ def course_available(result_xpath: str, course_name: str):
         next_course_remark = DRIVER.find_element(
             By.XPATH, next_course_xpath + "/td[13]/font"
         ).text
-        course_remark += f" {next_course_remark}"
+        if kw_present(keywords, next_course_remark):
+            return False
 
-    if any(filter(lambda kw: kw in course_remark, keywords)):
+    if kw_present(keywords, course_remark):
         return False
 
     num_seats = DRIVER.find_element(By.XPATH, result_xpath + "/td[7]/font").text
@@ -103,11 +104,18 @@ def get_next_course_xpath(result_xpath: str):
     return result_xpath
 
 
+def kw_present(keywords: list[str], target: str):
+    for kw in keywords:
+        if kw in target:
+            return True
+    return False
+
+
 async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str]):
     """Notifies each user on Telegram and unsubscribes them from the course."""
     for uid in users:
         await BOT.send_message(uid, msg, write_timeout=TIMEOUT_SECONDS)
-        DB.unsubscribe(str(course), uid)
+        DB.unsubscribe(course.get_course_name(), uid)
 
 
 async def notify_admin(msg: str):
@@ -138,15 +146,16 @@ async def main(env=PROD):
     DB = Database(env)
 
     options = webdriver.ChromeOptions()
-    if bin_path := os.getenv("GOOGLE_CHROME_BIN"):
-        options.binary_location = bin_path
-        options.add_argument("--start-maximized")
-        options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-gpu")
     options.add_argument("--disable-dev-shm-usage")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
+    if env == PROD:
+        options.binary_location = os.getenv("GOOGLE_CHROME_BIN")
+        options.add_argument("--start-maximized")
+        options.add_argument("--headless=new")
+
     DRIVER = webdriver.Chrome(
         service=Service(
             executable_path=os.getenv("CHROMEDRIVER_PATH")
