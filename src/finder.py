@@ -2,9 +2,9 @@ import os
 import sys
 import time
 import asyncio
-import telegram
 import pendulum
 from dotenv import load_dotenv
+from telegram import Bot, constants, CallbackQuery
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
@@ -14,13 +14,97 @@ from selenium.common.exceptions import WebDriverException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.constants import DEV, PROD, TIMEOUT_SECONDS
+from utils.constants import *
 from utils.course import Course
 from utils.db import Database
 
 load_dotenv()
 
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
+
+REG_TITLE = "Add Classes - Display"
+REG_CFM = "Add Classes - Confirmation"
+REG_OPT = "Registration Options"
+
+BOT = None
+DB = None
+DRIVER = None
+
+
+async def register_course(env: str, user_cache: dict, query: CallbackQuery):
+    """Regiser a course for the user, to be called by the bot."""
+    # Create one driver per task
+    driver, wait = init_driver(env)
+
+    # Login
+    await query.edit_message_text("Signing you in...")
+    course = Course(user_cache[LAST_SUBSCRIPTION])
+    driver.get(course.reg_url)
+    wait.until(
+        EC.visibility_of_element_located(
+            (By.XPATH, """//*[@id="wrapper"]/div/form/fieldset""")
+        )
+    )
+    username_box = driver.find_element(By.ID, "j_username")
+    password_box = driver.find_element(By.ID, "j_password")
+    login_button = driver.find_element(By.NAME, "_eventId_proceed")
+    username_box.send_keys(user_cache[USERNAME])
+    password_box.send_keys(user_cache[PASSWORD])
+    login_button.click()
+
+    login_error_xpath = """//*[@id="wrapper"]/div/div[1]"""
+    if driver.find_elements(By.XPATH, login_error_xpath):
+        await query.edit_message_text("Invalid login credentials. Please try again.")
+        time.sleep(1)
+        raise ValueError
+
+    await query.edit_message_text("Awaiting DUO authentication...")
+    dont_trust_button = wait.until(
+        EC.visibility_of_element_located((By.ID, "dont-trust-browser-button"))
+    )
+    dont_trust_button.click()
+
+    # Check validity of course
+    await query.edit_message_text("Registering for the course...")
+    wait.until(EC.title_is(REG_TITLE))
+    pinned_xpath = "/html/body/form/table[1]/tbody/tr[2]/td[2]/table/tbody/tr/td[1]/img"
+    result_row_index = 3 if driver.find_elements(By.XPATH, pinned_xpath) else 2
+    result_xpath = f"/html/body/form/table[1]/tbody/tr[{result_row_index}]"
+    input_xpath = result_xpath + "/td[1]/input"
+    if not driver.find_elements(By.XPATH, input_xpath):
+        await query.edit_message_text(
+            f"{course.get_course_name()} is not available. Use /resubscribe to get notified when it is."
+        )
+        return
+
+    # Hack to handle semester mismatch screen
+    driver.find_element(By.XPATH, "/html/body/table[2]/tbody/tr/td[2]/a").click()
+    wait.until(EC.title_is(REG_OPT))
+    driver.get(course.reg_url)
+    wait.until(EC.title_is(REG_TITLE))
+
+    # Register
+    input = driver.find_element(By.XPATH, input_xpath)
+    add_class_btn = driver.find_element(
+        By.XPATH, "/html/body/form/center[2]/table/tbody/tr/td[1]/input"
+    )
+    input.click()
+    add_class_btn.click()
+
+    alert = wait.until(EC.alert_is_present())
+    alert.accept()
+
+    wait.until(EC.title_is(REG_CFM))
+    cfm_img = driver.find_element(By.XPATH, "/html/body/table[4]/tbody/tr[2]/td[1]/img")
+    if "checkmark" in cfm_img.get_attribute("src"):
+        await query.edit_message_text(
+            f"Successfully registered for {course.get_course_name()}!"
+        )
+    else:
+        await query.edit_message_text(
+            f"Failed to register for {course.get_course_name()}\. Register manually [here]({course.reg_option_url})\.",
+            parse_mode=constants.ParseMode.MARKDOWN_V2,
+        )
 
 
 async def search_courses():
@@ -64,7 +148,7 @@ async def process_course(course: Course, users: list[str]):
         await notify_users_and_unsubscribe(course, msg, users)
         return
     if course_available(result_xpath, course_name_db):
-        msg = f"{course_name_db} is now available at {course.reg_url}"
+        msg = f"{course_name_db} is now available! Use /register to add it to your schedule."
         await notify_users_and_unsubscribe(course, msg, users)
 
 
@@ -105,16 +189,17 @@ def get_next_course_xpath(result_xpath: str):
 
 
 def kw_present(keywords: list[str], target: str):
-    for kw in keywords:
-        if kw in target:
-            return True
-    return False
+    return any(kw in target for kw in keywords)
 
 
 async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str]):
     """Notifies each user on Telegram and unsubscribes them from the course."""
     for uid in users:
-        await BOT.send_message(uid, msg, write_timeout=TIMEOUT_SECONDS)
+        await BOT.send_message(
+            chat_id=uid,
+            text=msg,
+            write_timeout=TIMEOUT_SECONDS,
+        )
         DB.unsubscribe(course.get_course_name(), uid)
 
 
@@ -136,15 +221,15 @@ def driver_alive():
         return False
 
 
-async def main(env=PROD):
-    """Runs the finder every minute."""
-    print("Starting finder...")
+def init(env: str):
     global BOT, DB, DRIVER, WAIT
-
     bot_token = os.getenv("TELEGRAM_TOKEN" if env == PROD else "TEST_TELEGRAM_TOKEN")
-    BOT = telegram.Bot(token=bot_token)
+    BOT = Bot(token=bot_token)
     DB = Database(env)
+    DRIVER, WAIT = init_driver(env)
 
+
+def init_driver(env: str):
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-gpu")
@@ -156,16 +241,24 @@ async def main(env=PROD):
         options.add_argument("--start-maximized")
         options.add_argument("--headless=new")
 
-    DRIVER = webdriver.Chrome(
+    driver = webdriver.Chrome(
         service=Service(
-            executable_path=os.getenv("CHROMEDRIVER_PATH")
-            if env == PROD
-            else ChromeDriverManager().install()
+            executable_path=(
+                os.getenv("CHROMEDRIVER_PATH")
+                if env == PROD
+                else ChromeDriverManager().install()
+            )
         ),
         options=options,
     )
-    WAIT = WebDriverWait(DRIVER, timeout=30)
+    wait = WebDriverWait(driver, timeout=30)
+    return driver, wait
 
+
+async def main(env=PROD):
+    """Runs the finder every minute."""
+    print("Starting finder...")
+    init(env)
     timeout = None
     while True:
         try:
@@ -174,7 +267,7 @@ async def main(env=PROD):
             await search_courses()
 
         except TimeoutException:
-            if not timeout:
+            if timeout is None:
                 timeout = pendulum.now()
             else:
                 minutes_since_last_timeout = pendulum.now().diff(timeout).in_minutes()

@@ -30,11 +30,13 @@ class Course:
     formatted_params: str = field(init=False)
     bin_url: str = field(init=False)
     reg_url: str = field(init=False)
+    reg_option_url: str = field(init=False)
 
     def __post_init__(self, course_name: str):
         college, dep_num, section = course_name.split()
         department, number = dep_num[:2], dep_num[2:]
         semester, year = self.get_sem_year().split()
+        year = int(year)
 
         object.__setattr__(self, "college", college.upper())
         object.__setattr__(self, "department", department.upper())
@@ -49,14 +51,15 @@ class Course:
             f"&Dept={self.department}&Course={self.number}&Section={self.section}",
         )
         object.__setattr__(self, "bin_url", self._bin_prefix + self.formatted_params)
+        object.__setattr__(self, "reg_url", self._reg_prefix + self.formatted_params)
         object.__setattr__(
-            self, "reg_url", self._reg_option_prefix + self.formatted_params
+            self, "reg_option_url", self._reg_option_prefix + self.formatted_params
         )
 
     @staticmethod
     def get_sem_year():
         now = pendulum.now()
-        semester = "Fall" if 4 <= now.month < 10 else "Spring"
+        semester = "Fall" if 3 <= now.month <= 9 else "Spring"
         year = (
             now.year + 1
             if (semester == "Spring" and 10 <= now.month <= 12)

@@ -18,6 +18,7 @@ from telegram.ext import (
 )
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.finder import register_course
 from utils.constants import *
 from utils import conv
 from utils.db import Database
@@ -46,7 +47,7 @@ def get_subscription_status(
     if not user_cache[IS_SUBSCRIBED]:
         for key in FORM_FIELDS:
             user_cache.pop(key, None)
-    elif not FORM_FIELDS.issubset(user_cache):
+    elif not FORM_FIELDS.issubset(user_cache):  # Check if user cache is missing fields
         user_course = DB.get_user_course(user_id)
         populate_cache(user_cache, user_course)
 
@@ -86,11 +87,9 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check user constraints (subscription status and time)
     if is_subscribed:
         course_name = conv.get_course_name(user_cache)
-        text = (
-            f"*You are already subscribed to {course_name}*\!\n\n"
-            "Use /unsubscribe to remove your subscription\."
+        await update.message.reply_markdown_v2(
+            conv.already_subscribed_md(course_name), quote=True
         )
-        await update.message.reply_markdown_v2(text, quote=True)
         return ConversationHandler.END
 
     if DB.env == PROD and last_subscribed:
@@ -99,18 +98,15 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
             next_subscribed_local = next_subscribed.in_timezone(
                 "America/New_York"
             ).strftime("%b %d %I:%M%p %Z")
-            text = (
-                "*You have recently subscribed to a course*\.\n\n"
-                f"Please wait until {next_subscribed_local} to subscribe\."
+            await update.message.reply_markdown_v2(
+                conv.recently_subscribed_md(next_subscribed_local), quote=True
             )
-            await update.message.reply_markdown_v2(text, quote=True)
             return ConversationHandler.END
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
-    subscription_text = conv.get_subscription_text(user_cache)
     conv_message = await update.message.reply_markdown_v2(
-        subscription_text, quote=True, reply_markup=keyboard
+        text=conv.get_subscription_md(user_cache), quote=True, reply_markup=keyboard
     )
     user_cache[SUBSCRIPTION_MSG_ID] = conv_message.message_id
 
@@ -121,12 +117,13 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels and ends the conversation"""
     query = update.callback_query
     await clear_invalid_msg(context.user_data, context)
+    for key in CRED_FIELDS:
+        context.user_data.pop(key, None)
     if query:  # callback
         await query.answer()
         await cast(Message, update.effective_message).edit_text("Transaction aborted.")
     else:  # command
         await context.bot.send_message(context._chat_id, "Transaction aborted.")
-
     return ConversationHandler.END
 
 
@@ -148,13 +145,10 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_cache = cast(dict, context.user_data)
     user_cache[COLLEGE] = query.data
 
-    buttons = conv.get_main_buttons(user_cache)
-    keyboard = InlineKeyboardMarkup(buttons)
-    subscription_text = conv.get_subscription_text(user_cache)
-    await update.callback_query.edit_message_text(
-        text=subscription_text,
+    await query.edit_message_text(
+        text=conv.get_subscription_md(user_cache),
         parse_mode=constants.ParseMode.MARKDOWN_V2,
-        reply_markup=keyboard,
+        reply_markup=InlineKeyboardMarkup(conv.get_main_buttons(user_cache)),
     )
     return AWAIT_SELECTION
 
@@ -200,16 +194,13 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg = await message.reply_text("Invalid input. Please try again.")
         user_cache[INVALID_MSG_ID] = msg.message_id
 
-    if not conv.form_fields_equal(user_cache, user_cache_snapshot):
-        buttons = conv.get_main_buttons(user_cache)
-        keyboard = InlineKeyboardMarkup(buttons)
-        subscription_text = conv.get_subscription_text(user_cache)
+    if not conv.fields_equal(user_cache, user_cache_snapshot, FORM_FIELDS):
         await context.bot.edit_message_text(
-            text=subscription_text,
+            text=conv.get_subscription_md(user_cache),
             chat_id=context._chat_id,
             message_id=user_cache[SUBSCRIPTION_MSG_ID],
             parse_mode=constants.ParseMode.MARKDOWN_V2,
-            reply_markup=keyboard,
+            reply_markup=InlineKeyboardMarkup(conv.get_main_buttons(user_cache)),
         )
     return AWAIT_SELECTION
 
@@ -234,27 +225,152 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask user for confirmation to register"""
+    user_cache = cast(dict, context.user_data)
+    is_subscribed, last_subscribed = get_subscription_status(user_cache, context)
+
+    if last_subscribed is None:
+        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
+        return ConversationHandler.END
+
+    if is_subscribed:
+        await update.message.reply_text(conv.NOT_AVAILABLE_TEXT, quote=True)
+        return ConversationHandler.END
+
+    reg_prompt = f"Register for {user_cache[LAST_SUBSCRIPTION]}?"
+    await update.message.reply_text(
+        text=reg_prompt,
+        quote=True,
+        reply_markup=InlineKeyboardMarkup(conv.get_confirmation_buttons()),
+    )
+    return AWAIT_SELECTION
+
+
+async def await_credentials(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Ask user for credentials"""
+    user_cache = cast(dict, context.user_data)
+    query = update.callback_query
+    cred_text = conv.get_cred_text(user_cache)
+    reply_markup = InlineKeyboardMarkup(conv.get_cred_buttons(user_cache))
+    if query:
+        await query.answer()
+        conv_message = await query.edit_message_text(
+            text=cred_text,
+            reply_markup=reply_markup,
+        )
+    else:
+        conv_message = await context.bot.edit_message_text(
+            text=cred_text,
+            chat_id=context._chat_id,
+            message_id=user_cache[CRED_MSG_ID],
+            reply_markup=reply_markup,
+        )
+    user_cache[CRED_MSG_ID] = conv_message.message_id
+    return AWAIT_SELECTION
+
+
+async def await_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await ask_credential(update, context, USERNAME)
+    return AWAIT_INPUT_USERNAME
+
+
+async def await_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await ask_credential(update, context, PASSWORD)
+    return AWAIT_INPUT_PASSWORD
+
+
+async def ask_credential(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    credential: str,
+):
+    query = update.callback_query
+    await query.answer()
+    user_cache = cast(dict, context.user_data)
+    await clear_invalid_msg(user_cache, context)
+    credential = "password" if credential == PASSWORD else "username"
+    prompt = await context.bot.send_message(
+        context._chat_id, f"State your {credential}", reply_markup=ForceReply()
+    )
+    user_cache[PROMPT_MSG_ID] = prompt.message_id
+
+
+async def save_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_credential(update, context, USERNAME)
+    return AWAIT_SELECTION
+
+
+async def save_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await save_credential(update, context, PASSWORD)
+    return AWAIT_SELECTION
+
+
+async def save_credential(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    credential: str,
+):
+    message = update.message
+    user_cache = cast(dict, context.user_data)
+    user_cache_snapshot = user_cache.copy()
+    user_cache[credential] = message.text
+    await message.delete()
+    await context.bot.delete_message(context._chat_id, user_cache[PROMPT_MSG_ID])
+
+    new_text = conv.get_cred_text(user_cache)
+    old_text = conv.get_cred_text(user_cache_snapshot)
+    if new_text != old_text:
+        await context.bot.edit_message_text(
+            text=new_text,
+            chat_id=context._chat_id,
+            message_id=user_cache[CRED_MSG_ID],
+            reply_markup=InlineKeyboardMarkup(conv.get_cred_buttons(user_cache)),
+        )
+
+
+async def start_webdriver(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    user_cache = cast(dict, context.user_data)
+    try:
+        await query.edit_message_text("Establishing connection...")
+        await register_course(DB.env, user_cache, query)
+    except ValueError:
+        return await await_credentials(update, context)
+    except Exception as e:
+        await query.edit_message_text(
+            text="An error occurred while registering. We have been notified. Please try again later."
+        )
+        raise e
+    for key in CRED_FIELDS:
+        user_cache.pop(key, None)
+    return ConversationHandler.END
+
+
 async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask user for confirmation to resubscribe"""
     user_cache = cast(dict, context.user_data)
     is_subscribed, _ = get_subscription_status(user_cache, context)
     if is_subscribed:
-        text = (
-            f"*You are already subscribed to {conv.get_course_name(user_cache)}*\!\n\n"
-            "Use /unsubscribe to remove your subscription\."
+        course_name = conv.get_course_name(user_cache)
+        await update.message.reply_markdown_v2(
+            conv.already_subscribed_md(course_name), quote=True
         )
-        await update.message.reply_markdown_v2(text, quote=True)
         return ConversationHandler.END
 
     if not user_cache[LAST_SUBSCRIPTION]:
         await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
         return ConversationHandler.END
 
-    buttons = conv.get_confirmation_buttons()
-    keyboard = InlineKeyboardMarkup(buttons)
     text = f"Confirm resubscription to {user_cache[LAST_SUBSCRIPTION]}?"
-    await update.message.reply_text(text, quote=True, reply_markup=keyboard)
-    return AWAIT_CUSTOM_INPUT
+    await update.message.reply_text(
+        text=text,
+        quote=True,
+        reply_markup=InlineKeyboardMarkup(conv.get_confirmation_buttons()),
+    )
+    return AWAIT_SELECTION
 
 
 async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -334,12 +450,12 @@ async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/help` command"""
-    await update.message.reply_markdown_v2(conv.HELP_TEXT, quote=True)
+    await update.message.reply_markdown_v2(conv.HELP_MD, quote=True)
 
 
 async def about(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/about` command"""
-    await update.message.reply_markdown_v2(conv.ABOUT_TEXT, quote=True)
+    await update.message.reply_markdown_v2(conv.ABOUT_MD, quote=True)
 
 
 async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
@@ -375,7 +491,7 @@ def main(env=PROD):
     bot_token = os.getenv("TELEGRAM_TOKEN" if env == PROD else "TEST_TELEGRAM_TOKEN")
     application = ApplicationBuilder().token(bot_token).build()
 
-    selection_handlers = [
+    subscription_sel_handlers = [
         CallbackQueryHandler(await_college_input, pattern="^" + INPUT_COLLEGE + "$"),
         CallbackQueryHandler(
             await_custom_input,
@@ -383,11 +499,17 @@ def main(env=PROD):
         ),
         CallbackQueryHandler(submit, pattern="^" + SUBMIT + "$"),
     ]
+    reg_sel_handlers = [
+        CallbackQueryHandler(await_credentials, pattern="^" + PROCEED + "$"),
+        CallbackQueryHandler(await_username, pattern="^" + INPUT_USERNAME + "$"),
+        CallbackQueryHandler(await_password, pattern="^" + INPUT_PASSWORD + "$"),
+        CallbackQueryHandler(start_webdriver, pattern="^" + SUBMIT + "$"),
+    ]
 
     subscription_handler = ConversationHandler(
         entry_points=[CommandHandler("subscribe", subscribe)],
         states={
-            AWAIT_SELECTION: selection_handlers,
+            AWAIT_SELECTION: subscription_sel_handlers,
             AWAIT_CUSTOM_INPUT: [MessageHandler(filters.REPLY, save_custom_input)],
         },
         fallbacks=[
@@ -396,11 +518,23 @@ def main(env=PROD):
             CommandHandler("cancel", cancel),
         ],
     )
+    register_handler = ConversationHandler(
+        entry_points=[CommandHandler("register", register)],
+        states={
+            AWAIT_SELECTION: reg_sel_handlers,
+            AWAIT_INPUT_USERNAME: [MessageHandler(filters.REPLY, save_username)],
+            AWAIT_INPUT_PASSWORD: [MessageHandler(filters.REPLY, save_password)],
+        },
+        fallbacks=[
+            CallbackQueryHandler(cancel, pattern="^" + CANCEL + "$"),
+            CommandHandler("cancel", cancel),
+        ],
+    )
     resubscription_handler = ConversationHandler(
         entry_points=[CommandHandler("resubscribe", resubscribe_dialog)],
         states={
-            AWAIT_CUSTOM_INPUT: [
-                CallbackQueryHandler(resubscribe, pattern="^" + SUBMIT + "$")
+            AWAIT_SELECTION: [
+                CallbackQueryHandler(resubscribe, pattern="^" + PROCEED + "$")
             ],
         },
         fallbacks=[
@@ -412,7 +546,7 @@ def main(env=PROD):
         entry_points=[CommandHandler("unsubscribe", unsubscribe_dialog)],
         states={
             AWAIT_SELECTION: [
-                CallbackQueryHandler(unsubscribe, pattern="^" + SUBMIT + "$")
+                CallbackQueryHandler(unsubscribe, pattern="^" + PROCEED + "$")
             ]
         },
         fallbacks=[
@@ -428,6 +562,7 @@ def main(env=PROD):
     unknown_handler = MessageHandler(filters.COMMAND, unknown)
 
     application.add_handler(subscription_handler)
+    application.add_handler(register_handler)
     application.add_handler(resubscription_handler)
     application.add_handler(unsubscribe_handler)
     application.add_handler(feedback_handler)
