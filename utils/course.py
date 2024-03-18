@@ -59,7 +59,7 @@ class Course:
     @staticmethod
     def get_sem_year():
         now = pendulum.now()
-        semester = "Fall" if 3 <= now.month <= 9 else "Spring"
+        semester = "Fall" if 4 <= now.month <= 9 else "Spring"
         year = (
             now.year + 1
             if (semester == "Spring" and 10 <= now.month <= 12)
