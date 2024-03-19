@@ -6,10 +6,12 @@ import pendulum
 from dotenv import load_dotenv
 from telegram import Bot, constants, CallbackQuery
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.alert import Alert
 from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
 from selenium.common.exceptions import WebDriverException, TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
@@ -18,27 +20,25 @@ from utils.constants import *
 from utils.course import Course
 from utils.db import Database
 
+
 load_dotenv()
 
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
-
 REG_TITLE = "Add Classes - Display"
-REG_CFM = "Add Classes - Confirmation"
 REG_OPT = "Registration Options"
-
-BOT = None
-DB = None
-DRIVER = None
+REG_CFM = "Add Classes - Confirmation"
 
 
 async def register_course(env: str, user_cache: dict, query: CallbackQuery):
-    """Regiser a course for the user, to be called by the bot."""
+    """Regiser a course for the user, to be called by `bot.py`"""
     # Create one driver per task
-    driver, wait = init_driver(env)
+    driver, wait = init_driver(env, wait_timeout=10)
+    course_name = user_cache.get(LAST_SUBSCRIPTION, "")
+    assert course_name, "No course to register."
+    course = Course(course_name)
 
     # Login
     await query.edit_message_text("Signing you in...")
-    course = Course(user_cache[LAST_SUBSCRIPTION])
     driver.get(course.reg_url)
     wait.until(
         EC.visibility_of_element_located(
@@ -48,8 +48,10 @@ async def register_course(env: str, user_cache: dict, query: CallbackQuery):
     username_box = driver.find_element(By.ID, "j_username")
     password_box = driver.find_element(By.ID, "j_password")
     login_button = driver.find_element(By.NAME, "_eventId_proceed")
-    username_box.send_keys(user_cache[USERNAME])
-    password_box.send_keys(user_cache[PASSWORD])
+    username, password = user_cache.get(USERNAME, ""), user_cache.get(PASSWORD, "")
+    assert username and password, "No username or password found."
+    username_box.send_keys(username)
+    password_box.send_keys(password)
     login_button.click()
 
     login_error_xpath = """//*[@id="wrapper"]/div/div[1]"""
@@ -59,7 +61,7 @@ async def register_course(env: str, user_cache: dict, query: CallbackQuery):
         raise ValueError
 
     await query.edit_message_text("Awaiting DUO authentication...")
-    dont_trust_button = wait.until(
+    dont_trust_button: WebElement = wait.until(
         EC.visibility_of_element_located((By.ID, "dont-trust-browser-button"))
     )
     dont_trust_button.click()
@@ -73,7 +75,7 @@ async def register_course(env: str, user_cache: dict, query: CallbackQuery):
     input_xpath = result_xpath + "/td[1]/input"
     if not driver.find_elements(By.XPATH, input_xpath):
         await query.edit_message_text(
-            f"{course.get_course_name()} is not available. Use /resubscribe to get notified when it is."
+            f"{course_name} is not available. Use /resubscribe to get notified when it is."
         )
         return
 
@@ -91,18 +93,16 @@ async def register_course(env: str, user_cache: dict, query: CallbackQuery):
     input.click()
     add_class_btn.click()
 
-    alert = wait.until(EC.alert_is_present())
+    alert: Alert = wait.until(EC.alert_is_present())
     alert.accept()
 
     wait.until(EC.title_is(REG_CFM))
     cfm_img = driver.find_element(By.XPATH, "/html/body/table[4]/tbody/tr[2]/td[1]/img")
     if "checkmark" in cfm_img.get_attribute("src"):
-        await query.edit_message_text(
-            f"Successfully registered for {course.get_course_name()}!"
-        )
+        await query.edit_message_text(f"Successfully registered for {course_name}!")
     else:
         await query.edit_message_text(
-            f"Failed to register for {course.get_course_name()}\. Register manually [here]({course.reg_option_url})\.",
+            f"Failed to register for {course_name}\. Register manually [here]({course.reg_option_url})\.",
             parse_mode=constants.ParseMode.MARKDOWN_V2,
         )
 
@@ -146,8 +146,7 @@ async def process_course(course: Course, users: list[str]):
     if course_name_db != course_name_web:
         msg = f"{course_name_db} was not found in the University Class Schedule. Did you mean {course_name_web}?"
         await notify_users_and_unsubscribe(course, msg, users)
-        return
-    if course_available(result_xpath, course_name_db):
+    elif course_available(result_xpath, course_name_db):
         msg = f"{course_name_db} is now available! Use /register to add it to your schedule."
         await notify_users_and_unsubscribe(course, msg, users)
 
@@ -229,7 +228,7 @@ def init(env: str):
     DRIVER, WAIT = init_driver(env)
 
 
-def init_driver(env: str):
+def init_driver(env: str, wait_timeout=30):
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-gpu")
@@ -251,7 +250,7 @@ def init_driver(env: str):
         ),
         options=options,
     )
-    wait = WebDriverWait(driver, timeout=30)
+    wait = WebDriverWait(driver, timeout=wait_timeout)
     return driver, wait
 
 
@@ -275,13 +274,10 @@ async def main(env=PROD):
                     await notify_admin(
                         f"Finder timed out for {minutes_since_last_timeout} minutes."
                     )
-
         except Exception as exc:
             await notify_admin(repr(exc))
-
         else:
             timeout = None
-
         finally:
             time.sleep(60)
 

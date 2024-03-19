@@ -47,7 +47,7 @@ def get_subscription_status(
     if not user_cache[IS_SUBSCRIBED]:
         for key in FORM_FIELDS:
             user_cache.pop(key, None)
-    elif not FORM_FIELDS.issubset(user_cache):  # Check if user cache is missing fields
+    elif not all(field in user_cache for field in FORM_FIELDS):
         user_course = DB.get_user_course(user_id)
         populate_cache(user_cache, user_course)
 
@@ -115,15 +115,16 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels and ends the conversation"""
-    query = update.callback_query
     await clear_invalid_msg(context.user_data, context)
     for key in CRED_FIELDS:
         context.user_data.pop(key, None)
-    if query:  # callback
+
+    abort_msg = "Transaction aborted."
+    if query := update.callback_query:
         await query.answer()
-        await cast(Message, update.effective_message).edit_text("Transaction aborted.")
-    else:  # command
-        await context.bot.send_message(context._chat_id, "Transaction aborted.")
+        await cast(Message, update.effective_message).edit_text(abort_msg)
+    else:
+        await context.bot.send_message(context._chat_id, abort_msg)
     return ConversationHandler.END
 
 
@@ -178,12 +179,16 @@ async def await_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check callback data and update cache for custom inputs"""
     message = update.message
-    user_cache = cast(dict, context.user_data)
-    reply = message.text.upper()
     await message.delete()
-    await context.bot.delete_message(context._chat_id, user_cache[PROMPT_MSG_ID])
+
+    user_cache = cast(dict, context.user_data)
+    prompt_msg_id = user_cache.get(PROMPT_MSG_ID, None)
+    assert prompt_msg_id, "Prompt message ID not found"
+    await context.bot.delete_message(context._chat_id, prompt_msg_id)
+
     user_cache_snapshot = user_cache.copy()
 
+    reply = message.text.upper()
     if re.fullmatch("^[A-Z]{2}$", reply):
         user_cache[DEPARTMENT] = reply
     elif re.fullmatch("^[1-9]{1}[0-9]{2}$", reply):
@@ -195,10 +200,12 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_cache[INVALID_MSG_ID] = msg.message_id
 
     if not conv.fields_equal(user_cache, user_cache_snapshot, FORM_FIELDS):
+        sub_msg_id = user_cache.get(SUBSCRIPTION_MSG_ID, None)
+        assert sub_msg_id, "Subscription message ID not found"
         await context.bot.edit_message_text(
             text=conv.get_subscription_md(user_cache),
             chat_id=context._chat_id,
-            message_id=user_cache[SUBSCRIPTION_MSG_ID],
+            message_id=sub_msg_id,
             parse_mode=constants.ParseMode.MARKDOWN_V2,
             reply_markup=InlineKeyboardMarkup(conv.get_main_buttons(user_cache)),
         )
@@ -215,8 +222,8 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
     curr_time = pendulum.now()
-
     DB.subscribe(course_name, user_id, curr_time)
+
     user_cache[IS_SUBSCRIBED] = True
     user_cache[LAST_SUBSCRIBED] = curr_time
     await cast(Message, update.effective_message).reply_text(
@@ -238,7 +245,9 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(conv.NOT_AVAILABLE_TEXT, quote=True)
         return ConversationHandler.END
 
-    reg_prompt = f"Register for {user_cache[LAST_SUBSCRIPTION]}?"
+    last_subscribed_course = user_cache.get(LAST_SUBSCRIPTION, "")
+    assert last_subscribed_course, "Last subscribed course not found"
+    reg_prompt = f"Register for {last_subscribed_course}?"
     await update.message.reply_text(
         text=reg_prompt,
         quote=True,
@@ -248,22 +257,22 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def await_credentials(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ask user for credentials"""
     user_cache = cast(dict, context.user_data)
-    query = update.callback_query
     cred_text = conv.get_cred_text(user_cache)
     reply_markup = InlineKeyboardMarkup(conv.get_cred_buttons(user_cache))
-    if query:
+    if query := update.callback_query:
         await query.answer()
         conv_message = await query.edit_message_text(
             text=cred_text,
             reply_markup=reply_markup,
         )
     else:
+        cred_msg_id = user_cache.get(CRED_MSG_ID, None)
+        assert cred_msg_id, "Credential message ID not found"
         conv_message = await context.bot.edit_message_text(
             text=cred_text,
             chat_id=context._chat_id,
-            message_id=user_cache[CRED_MSG_ID],
+            message_id=cred_msg_id,
             reply_markup=reply_markup,
         )
     user_cache[CRED_MSG_ID] = conv_message.message_id
@@ -281,12 +290,9 @@ async def await_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ask_credential(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    credential: str,
+    update: Update, context: ContextTypes.DEFAULT_TYPE, credential: str
 ):
-    query = update.callback_query
-    await query.answer()
+    await update.callback_query.answer()
     user_cache = cast(dict, context.user_data)
     await clear_invalid_msg(user_cache, context)
     credential = "password" if credential == PASSWORD else "username"
@@ -307,9 +313,7 @@ async def save_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def save_credential(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE,
-    credential: str,
+    update: Update, context: ContextTypes.DEFAULT_TYPE, credential: str
 ):
     message = update.message
     user_cache = cast(dict, context.user_data)
@@ -321,10 +325,12 @@ async def save_credential(
     new_text = conv.get_cred_text(user_cache)
     old_text = conv.get_cred_text(user_cache_snapshot)
     if new_text != old_text:
+        cred_msg_id = user_cache.get(CRED_MSG_ID, None)
+        assert cred_msg_id, "Credential message ID not found"
         await context.bot.edit_message_text(
             text=new_text,
             chat_id=context._chat_id,
-            message_id=user_cache[CRED_MSG_ID],
+            message_id=cred_msg_id,
             reply_markup=InlineKeyboardMarkup(conv.get_cred_buttons(user_cache)),
         )
 
@@ -341,7 +347,7 @@ async def start_webdriver(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await await_credentials(update, context)
     except Exception as e:
         await query.edit_message_text(
-            text="An error occurred while registering. We have been notified. Please try again later."
+            text="An unexpected error occurred. Please try again later."
         )
         raise e
     for key in CRED_FIELDS:
@@ -360,11 +366,12 @@ async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return ConversationHandler.END
 
-    if not user_cache[LAST_SUBSCRIPTION]:
+    last_subscribed_course = user_cache.get(LAST_SUBSCRIPTION, "")
+    if last_subscribed_course == "":
         await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
         return ConversationHandler.END
 
-    text = f"Confirm resubscription to {user_cache[LAST_SUBSCRIPTION]}?"
+    text = f"Confirm resubscription to {last_subscribed_course}?"
     await update.message.reply_text(
         text=text,
         quote=True,
@@ -379,15 +386,16 @@ async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
 
     user_cache = cast(dict, context.user_data)
-    course_name = user_cache[LAST_SUBSCRIPTION]
+    last_subscribed_course = user_cache.get(LAST_SUBSCRIPTION, "")
+    assert last_subscribed_course, "Last subscribed course not found"
     user_id = str(context._user_id)
     curr_time = pendulum.now()
+    DB.subscribe(last_subscribed_course, user_id, curr_time)
 
-    DB.subscribe(course_name, user_id, curr_time)
     user_cache[IS_SUBSCRIBED] = True
     user_cache[LAST_SUBSCRIBED] = curr_time
     await cast(Message, update.effective_message).edit_text(
-        f"Successfully resubscribed to {course_name}."
+        f"Successfully resubscribed to {last_subscribed_course}."
     )
     return ConversationHandler.END
 
@@ -415,8 +423,8 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
-
     DB.unsubscribe(course_name, user_id)
+
     for key in FORM_FIELDS:
         user_cache.pop(key, None)
     user_cache[IS_SUBSCRIBED] = False

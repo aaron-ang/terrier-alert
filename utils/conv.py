@@ -89,7 +89,7 @@ def get_main_buttons(user_cache: dict):
                 text="Edit Section", callback_data=INPUT_SECTION
             )
 
-    if FORM_FIELDS.issubset(user_cache):
+    if all(field in user_cache for field in FORM_FIELDS):
         buttons.insert(-1, [InlineKeyboardButton(text="Submit", callback_data=SUBMIT)])
 
     return buttons
@@ -115,7 +115,7 @@ def get_cred_buttons(user_cache: dict):
                 text="Edit Password", callback_data=INPUT_PASSWORD
             )
 
-    if CRED_FIELDS.issubset(user_cache):
+    if all(field in user_cache for field in CRED_FIELDS):
         buttons.insert(-1, [InlineKeyboardButton(text="Submit", callback_data=SUBMIT)])
 
     return buttons
@@ -147,36 +147,39 @@ def get_confirmation_buttons():
 
 def get_course_name(user_cache: dict[str, str]):
     """Format course name to match input for Course class"""
+    assert all(
+        field in user_cache for field in FORM_FIELDS
+    ), "User cache does not contain all form fields"
     return f"{user_cache[COLLEGE]} {user_cache[DEPARTMENT]}{user_cache[COURSE_NUM]} {user_cache[SECTION]}"
 
 
 def get_subscription_md(user_cache: dict):
     """Format current subscription form data in markdown"""
-    college = "" if not user_cache.get(COLLEGE) else user_cache[COLLEGE] + "\n"
-    department = "" if not user_cache.get(DEPARTMENT) else user_cache[DEPARTMENT] + "\n"
-    course_num = "" if not user_cache.get(COURSE_NUM) else user_cache[COURSE_NUM] + "\n"
-    section = "" if not user_cache.get(SECTION) else user_cache[SECTION]
-    return (
-        f"*College:*\n{college}\n"
-        f"*Department:*\n{department}\n"
-        f"*Course:*\n{course_num}\n"
-        f"*Section:*\n{section}"
-    )
+    fields = {
+        COLLEGE: "College",
+        DEPARTMENT: "Department",
+        COURSE_NUM: "Course",
+        SECTION: "Section",
+    }
+    result = ""
+    for key, label in fields.items():
+        result += f"*{label}:*\n"
+        if value := user_cache.get(key, ""):
+            result += f"{value}\n"
+        result += "\n"
+    return result
 
 
 def get_cred_text(user_cache: dict):
     """Format user credentials"""
     username = user_cache.get(USERNAME, "")
+    password = user_cache.get(PASSWORD, "")
     # Display only the first and last characters of the password
-    password = (
-        ""
-        if not user_cache.get(PASSWORD)
-        else user_cache[PASSWORD][0]
-        + "*" * (len(user_cache[PASSWORD]) - 2)
-        + user_cache[PASSWORD][-1]
+    masked_password = (
+        password[0] + "*" * (len(password) - 2) + password[-1] if password else ""
     )
     privacy_note = "Note: Your credentials are only used to register for courses and are not stored.\n"
-    return f"{privacy_note}\nUsername: {username}\nPassword(hidden): {password}"
+    return f"{privacy_note}\nUsername: {username}\nPassword(hidden): {masked_password}"
 
 
 def recently_subscribed_md(time: str):
