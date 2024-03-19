@@ -256,7 +256,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return AWAIT_SELECTION
 
 
-async def await_credentials(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def update_credentials(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     cred_text = conv.get_cred_text(user_cache)
     reply_markup = InlineKeyboardMarkup(conv.get_cred_buttons(user_cache))
@@ -279,12 +279,12 @@ async def await_credentials(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return AWAIT_SELECTION
 
 
-async def await_username(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def request_username_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await ask_credential(update, context, USERNAME)
     return AWAIT_INPUT_USERNAME
 
 
-async def await_password(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def request_password_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await ask_credential(update, context, PASSWORD)
     return AWAIT_INPUT_PASSWORD
 
@@ -344,7 +344,7 @@ async def start_webdriver(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("Establishing connection...")
         await register_course(DB.env, user_cache, query)
     except ValueError:
-        return await await_credentials(update, context)
+        return await update_credentials(update, context)
     except Exception as e:
         await query.edit_message_text(
             text="An unexpected error occurred. Please try again later."
@@ -508,9 +508,9 @@ def main(env=PROD):
         CallbackQueryHandler(submit, pattern="^" + SUBMIT + "$"),
     ]
     reg_sel_handlers = [
-        CallbackQueryHandler(await_credentials, pattern="^" + PROCEED + "$"),
-        CallbackQueryHandler(await_username, pattern="^" + INPUT_USERNAME + "$"),
-        CallbackQueryHandler(await_password, pattern="^" + INPUT_PASSWORD + "$"),
+        CallbackQueryHandler(update_credentials, pattern="^" + PROCEED + "$"),
+        CallbackQueryHandler(request_username_input, pattern="^" + INPUT_USERNAME + "$"),
+        CallbackQueryHandler(request_password_input, pattern="^" + INPUT_PASSWORD + "$"),
         CallbackQueryHandler(start_webdriver, pattern="^" + SUBMIT + "$"),
     ]
 
