@@ -174,10 +174,7 @@ def get_cred_text(user_cache: dict):
     """Format user credentials"""
     username = user_cache.get(USERNAME, "")
     password = user_cache.get(PASSWORD, "")
-    # Display only the first and last characters of the password
-    masked_password = (
-        password[0] + "*" * (len(password) - 2) + password[-1] if password else ""
-    )
+    masked_password = "*" * len(password)
     privacy_note = "Note: Your credentials are only used to register for courses and are not stored.\n"
     return f"{privacy_note}\nUsername: {username}\nPassword(hidden): {masked_password}"
 
