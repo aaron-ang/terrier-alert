@@ -8,6 +8,10 @@ Deployed to Heroku.
 
 ![demo](doc/terrier-alert-demo.gif)
 
+### Register Feature
+
+![register](doc/terrier-alert-register.gif)
+
 ## System Design Overview
 
 ![system schema](doc/terrier-alert-overview.drawio.png)
