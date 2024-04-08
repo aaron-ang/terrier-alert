@@ -1,10 +1,10 @@
 import os
 import sys
 import time
-import asyncio
 import pendulum
 from dotenv import load_dotenv
-from telegram import Bot, constants, CallbackQuery
+from telegram import constants, CallbackQuery
+from telegram.ext import ContextTypes
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.alert import Alert
@@ -27,6 +27,8 @@ FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
 REG_TITLE = "Add Classes - Display"
 REG_OPT = "Registration Options"
 REG_CFM = "Add Classes - Confirmation"
+DRIVER: webdriver.Chrome = None
+timeout: pendulum.DateTime = None
 
 
 async def register_course(env: str, user_cache: dict, query: CallbackQuery):
@@ -105,6 +107,7 @@ async def register_course(env: str, user_cache: dict, query: CallbackQuery):
             f"Failed to register for {course_name}\. Register manually [here]({course.reg_option_url})\.",
             parse_mode=constants.ParseMode.MARKDOWN_V2,
         )
+    driver.quit()
 
 
 async def search_courses():
@@ -209,23 +212,23 @@ async def notify_admin(msg: str):
 
 def driver_alive():
     """Checks if the driver is still alive."""
+    if DRIVER is None:
+        return False
     try:
         if not DRIVER.service.is_connectable():
             return False
-
         DRIVER.service.assert_process_still_running()
         return True
-
     except WebDriverException:
         return False
 
 
-def init(env: str):
+def init(context: ContextTypes.DEFAULT_TYPE, db: Database, env: str):
     global BOT, DB, DRIVER, WAIT
-    bot_token = os.getenv("TELEGRAM_TOKEN" if env == PROD else "TEST_TELEGRAM_TOKEN")
-    BOT = Bot(token=bot_token)
-    DB = Database(env)
-    DRIVER, WAIT = init_driver(env)
+    BOT = context.bot
+    DB = db
+    if not driver_alive():
+        DRIVER, WAIT = init_driver(env)
 
 
 def init_driver(env: str, wait_timeout=30):
@@ -254,33 +257,28 @@ def init_driver(env: str, wait_timeout=30):
     return driver, wait
 
 
-async def main(env=PROD):
+async def run(context: ContextTypes.DEFAULT_TYPE):
     """Runs the finder every minute."""
-    print("Starting finder...")
-    init(env)
-    timeout = None
-    while True:
-        try:
-            if not driver_alive():
-                return
-            await search_courses()
+    global timeout
 
-        except TimeoutException:
-            if timeout is None:
-                timeout = pendulum.now()
-            else:
-                minutes_since_last_timeout = pendulum.now().diff(timeout).in_minutes()
-                if minutes_since_last_timeout % 20 == 0:
-                    await notify_admin(
-                        f"Finder timed out for {minutes_since_last_timeout} minutes."
-                    )
-        except Exception as exc:
-            await notify_admin(repr(exc))
+    if (now := pendulum.now()).minute % 30 == 0:
+        print("Finder started at", now.to_rss_string())
+
+    data = context.job.data
+    init(context, data["db"], data["env"])
+
+    try:
+        await search_courses()
+    except TimeoutException:
+        if timeout is None:
+            timeout = pendulum.now()
         else:
-            timeout = None
-        finally:
-            time.sleep(60)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+            minutes_since_last_timeout = pendulum.now().diff(timeout).in_minutes()
+            if minutes_since_last_timeout % 20 == 0:
+                await notify_admin(
+                    f"Finder timed out for {minutes_since_last_timeout} minutes."
+                )
+    except Exception as exc:
+        await notify_admin(repr(exc))
+    else:
+        timeout = None

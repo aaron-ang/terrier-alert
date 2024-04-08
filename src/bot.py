@@ -9,6 +9,7 @@ import pendulum
 from telegram import Update, InlineKeyboardMarkup, ForceReply, Message, constants, error
 from telegram.ext import (
     filters,
+    Application,
     ApplicationBuilder,
     CommandHandler,
     ContextTypes,
@@ -18,7 +19,7 @@ from telegram.ext import (
 )
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.finder import register_course
+import src.finder as finder
 from utils.constants import *
 from utils import conv
 from utils.db import Database
@@ -342,7 +343,7 @@ async def start_webdriver(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     try:
         await query.edit_message_text("Establishing connection...")
-        await register_course(DB.env, user_cache, query)
+        await finder.register_course(ENV, user_cache, query)
     except ValueError:
         return await update_credentials(update, context)
     except Exception as e:
@@ -493,11 +494,12 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 def main(env=PROD):
     print("Starting bot...")
-    global DB
+    global ENV, DB
 
-    DB = Database(env)
-    bot_token = os.getenv("TELEGRAM_TOKEN" if env == PROD else "TEST_TELEGRAM_TOKEN")
-    application = ApplicationBuilder().token(bot_token).build()
+    ENV = env
+    DB = Database(ENV)
+    bot_token = os.getenv("TELEGRAM_TOKEN" if ENV == PROD else "TEST_TELEGRAM_TOKEN")
+    application: Application = ApplicationBuilder().token(bot_token).build()
 
     subscription_sel_handlers = [
         CallbackQueryHandler(await_college_input, pattern="^" + INPUT_COLLEGE + "$"),
@@ -509,8 +511,12 @@ def main(env=PROD):
     ]
     reg_sel_handlers = [
         CallbackQueryHandler(update_credentials, pattern="^" + PROCEED + "$"),
-        CallbackQueryHandler(request_username_input, pattern="^" + INPUT_USERNAME + "$"),
-        CallbackQueryHandler(request_password_input, pattern="^" + INPUT_PASSWORD + "$"),
+        CallbackQueryHandler(
+            request_username_input, pattern="^" + INPUT_USERNAME + "$"
+        ),
+        CallbackQueryHandler(
+            request_password_input, pattern="^" + INPUT_PASSWORD + "$"
+        ),
         CallbackQueryHandler(start_webdriver, pattern="^" + SUBMIT + "$"),
     ]
 
@@ -579,6 +585,11 @@ def main(env=PROD):
     application.add_handler(CommandHandler("about", about))
     application.add_handler(unknown_handler)
     application.add_error_handler(error_handler)
+
+    job_queue = application.job_queue
+    job_queue.run_repeating(
+        callback=finder.run, interval=60, data={"env": ENV, "db": DB}
+    )
 
     application.run_polling()
 

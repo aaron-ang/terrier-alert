@@ -1,7 +1,7 @@
-certifi==2023.7.22
-pendulum==2.1.2
-pymongo==4.4.1
-python-dotenv==1.0.0
-python-telegram-bot==20.4
-selenium==4.10.0
+certifi==2024.2.2
+pendulum==3.0.0
+pymongo==4.6.3
+python-dotenv==1.0.1
+python-telegram-bot==21.0.1
+selenium==4.19.0
 webdriver-manager==4.0.1
