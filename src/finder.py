@@ -27,6 +27,7 @@ FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
 REG_TITLE = "Add Classes - Display"
 REG_OPT = "Registration Options"
 REG_CFM = "Add Classes - Confirmation"
+DB: Database = None
 DRIVER: webdriver.Chrome = None
 timeout: pendulum.DateTime = None
 
@@ -223,12 +224,12 @@ def driver_alive():
         return False
 
 
-def init(context: ContextTypes.DEFAULT_TYPE, db: Database, env: str):
+def init(context: ContextTypes.DEFAULT_TYPE):
     global BOT, DB, DRIVER, WAIT
     BOT = context.bot
-    DB = db
+    DB = context.job.data["db"]
     if not driver_alive():
-        DRIVER, WAIT = init_driver(env)
+        DRIVER, WAIT = init_driver(DB.env)
 
 
 def init_driver(env: str, wait_timeout=30):
@@ -264,8 +265,7 @@ async def run(context: ContextTypes.DEFAULT_TYPE):
     if (now := pendulum.now()).minute % 30 == 0:
         print("Finder started at", now.to_rss_string())
 
-    data = context.job.data
-    init(context, data["db"], data["env"])
+    init(context)
 
     try:
         await search_courses()

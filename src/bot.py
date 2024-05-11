@@ -3,9 +3,9 @@ import sys
 import re
 import html
 import traceback
+import pendulum
 from typing import cast
 from dotenv import load_dotenv
-import pendulum
 from telegram import Update, InlineKeyboardMarkup, ForceReply, Message, constants, error
 from telegram.ext import (
     filters,
@@ -19,7 +19,7 @@ from telegram.ext import (
 )
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import src.finder as finder
+from src import finder
 from utils.constants import *
 from utils import conv
 from utils.db import Database
@@ -343,7 +343,7 @@ async def start_webdriver(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache = cast(dict, context.user_data)
     try:
         await query.edit_message_text("Establishing connection...")
-        await finder.register_course(ENV, user_cache, query)
+        await finder.register_course(DB.env, user_cache, query)
     except ValueError:
         return await update_credentials(update, context)
     except Exception as e:
@@ -494,11 +494,10 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
 
 def main(env=PROD):
     print("Starting bot...")
-    global ENV, DB
+    global DB
 
-    ENV = env
-    DB = Database(ENV)
-    bot_token = os.getenv("TELEGRAM_TOKEN" if ENV == PROD else "TEST_TELEGRAM_TOKEN")
+    DB = Database(env)
+    bot_token = os.getenv("TELEGRAM_TOKEN" if env == PROD else "TEST_TELEGRAM_TOKEN")
     application: Application = ApplicationBuilder().token(bot_token).build()
 
     subscription_sel_handlers = [
@@ -587,9 +586,7 @@ def main(env=PROD):
     application.add_error_handler(error_handler)
 
     job_queue = application.job_queue
-    job_queue.run_repeating(
-        callback=finder.run, interval=60, data={"env": ENV, "db": DB}
-    )
+    job_queue.run_repeating(callback=finder.run, interval=60, data={"db": DB})
 
     application.run_polling()
 
