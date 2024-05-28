@@ -36,7 +36,7 @@ async def register_course(env: str, user_cache: dict, query: CallbackQuery):
     """Regiser a course for the user, to be called by `bot.py`"""
     # Create one driver per task
     driver, wait = init_driver(env, wait_timeout=10)
-    course_name = user_cache.get(LAST_SUBSCRIPTION, "")
+    course_name = user_cache.get(Message.LAST_SUBSCRIPTION, "")
     assert course_name, "No course to register."
     course = Course(course_name)
 
@@ -51,7 +51,9 @@ async def register_course(env: str, user_cache: dict, query: CallbackQuery):
     username_box = driver.find_element(By.ID, "j_username")
     password_box = driver.find_element(By.ID, "j_password")
     login_button = driver.find_element(By.NAME, "_eventId_proceed")
-    username, password = user_cache.get(USERNAME, ""), user_cache.get(PASSWORD, "")
+    username, password = user_cache.get(Message.USERNAME, ""), user_cache.get(
+        Message.PASSWORD, ""
+    )
     assert username and password, "No username or password found."
     username_box.send_keys(username)
     password_box.send_keys(password)
@@ -201,14 +203,16 @@ async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str
         await BOT.send_message(
             chat_id=uid,
             text=msg,
-            write_timeout=TIMEOUT_SECONDS,
+            write_timeout=TimeConstants.TIMEOUT_SECONDS,
         )
         DB.unsubscribe(course.get_course_name(), uid)
 
 
 async def notify_admin(msg: str):
     """Sends a notification to Telegram feedback channel."""
-    await BOT.send_message(FEEDBACK_CHANNEL_ID, msg, write_timeout=TIMEOUT_SECONDS)
+    await BOT.send_message(
+        FEEDBACK_CHANNEL_ID, msg, write_timeout=TimeConstants.TIMEOUT_SECONDS
+    )
 
 
 def driver_alive():
@@ -239,7 +243,7 @@ def init_driver(env: str, wait_timeout=30):
     options.add_argument("--disable-dev-shm-usage")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
-    if env == PROD:
+    if env == Environment.PROD:
         options.binary_location = os.getenv("GOOGLE_CHROME_BIN")
         options.add_argument("--start-maximized")
         options.add_argument("--headless=new")
@@ -248,7 +252,7 @@ def init_driver(env: str, wait_timeout=30):
         service=Service(
             executable_path=(
                 os.getenv("CHROMEDRIVER_PATH")
-                if env == PROD
+                if env == Environment.PROD
                 else ChromeDriverManager().install()
             )
         ),

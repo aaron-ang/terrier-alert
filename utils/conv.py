@@ -59,38 +59,46 @@ def get_main_buttons(user_cache: dict):
     """Return subscription form buttons"""
     buttons = [
         [
-            InlineKeyboardButton(text="Input College", callback_data=INPUT_COLLEGE),
             InlineKeyboardButton(
-                text="Input Department", callback_data=INPUT_DEPARTMENT
+                text="Input College", callback_data=InputStates.INPUT_COLLEGE
+            ),
+            InlineKeyboardButton(
+                text="Input Department", callback_data=InputStates.INPUT_DEPARTMENT
             ),
         ],
         [
-            InlineKeyboardButton(text="Input Course", callback_data=INPUT_COURSE_NUM),
-            InlineKeyboardButton(text="Input Section", callback_data=INPUT_SECTION),
+            InlineKeyboardButton(
+                text="Input Course", callback_data=InputStates.INPUT_COURSE_NUM
+            ),
+            InlineKeyboardButton(
+                text="Input Section", callback_data=InputStates.INPUT_SECTION
+            ),
         ],
-        [InlineKeyboardButton(text="Cancel", callback_data=CANCEL)],
+        [InlineKeyboardButton(text="Cancel", callback_data=InputStates.CANCEL)],
     ]
 
     for changed_fields in user_cache:
-        if changed_fields == COLLEGE:
+        if changed_fields == Message.COLLEGE:
             buttons[0][0] = InlineKeyboardButton(
-                text="Edit College", callback_data=INPUT_COLLEGE
+                text="Edit College", callback_data=InputStates.INPUT_COLLEGE
             )
-        elif changed_fields == DEPARTMENT:
+        elif changed_fields == Message.DEPARTMENT:
             buttons[0][1] = InlineKeyboardButton(
-                text="Edit Department", callback_data=INPUT_DEPARTMENT
+                text="Edit Department", callback_data=InputStates.INPUT_DEPARTMENT
             )
-        elif changed_fields == COURSE_NUM:
+        elif changed_fields == Message.COURSE_NUM:
             buttons[1][0] = InlineKeyboardButton(
-                text="Edit Course", callback_data=INPUT_COURSE_NUM
+                text="Edit Course", callback_data=InputStates.INPUT_COURSE_NUM
             )
-        elif changed_fields == SECTION:
+        elif changed_fields == Message.SECTION:
             buttons[1][1] = InlineKeyboardButton(
-                text="Edit Section", callback_data=INPUT_SECTION
+                text="Edit Section", callback_data=InputStates.INPUT_SECTION
             )
 
     if all(field in user_cache for field in FORM_FIELDS):
-        buttons.insert(-1, [InlineKeyboardButton(text="Submit", callback_data=SUBMIT)])
+        buttons.insert(
+            -1, [InlineKeyboardButton(text="Submit", callback_data=InputStates.SUBMIT)]
+        )
 
     return buttons
 
@@ -99,24 +107,30 @@ def get_cred_buttons(user_cache: dict):
     """Return user credential buttons"""
     buttons = [
         [
-            InlineKeyboardButton(text="Input Username", callback_data=INPUT_USERNAME),
-            InlineKeyboardButton(text="Input Password", callback_data=INPUT_PASSWORD),
+            InlineKeyboardButton(
+                text="Input Username", callback_data=InputStates.INPUT_USERNAME
+            ),
+            InlineKeyboardButton(
+                text="Input Password", callback_data=InputStates.INPUT_PASSWORD
+            ),
         ],
-        [InlineKeyboardButton(text="Cancel", callback_data=CANCEL)],
+        [InlineKeyboardButton(text="Cancel", callback_data=InputStates.CANCEL)],
     ]
 
     for changed_fields in user_cache:
-        if changed_fields == USERNAME:
+        if changed_fields == Message.USERNAME:
             buttons[0][0] = InlineKeyboardButton(
-                text="Edit Username", callback_data=INPUT_USERNAME
+                text="Edit Username", callback_data=InputStates.INPUT_USERNAME
             )
-        elif changed_fields == PASSWORD:
+        elif changed_fields == Message.PASSWORD:
             buttons[0][1] = InlineKeyboardButton(
-                text="Edit Password", callback_data=INPUT_PASSWORD
+                text="Edit Password", callback_data=InputStates.INPUT_PASSWORD
             )
 
     if all(field in user_cache for field in CRED_FIELDS):
-        buttons.insert(-1, [InlineKeyboardButton(text="Submit", callback_data=SUBMIT)])
+        buttons.insert(
+            -1, [InlineKeyboardButton(text="Submit", callback_data=InputStates.SUBMIT)]
+        )
 
     return buttons
 
@@ -139,8 +153,8 @@ def get_confirmation_buttons():
     """Return confirmation buttons"""
     return [
         [
-            InlineKeyboardButton("Yes", callback_data=PROCEED),
-            InlineKeyboardButton("No", callback_data=CANCEL),
+            InlineKeyboardButton("Yes", callback_data=InputStates.PROCEED),
+            InlineKeyboardButton("No", callback_data=InputStates.CANCEL),
         ]
     ]
 
@@ -150,16 +164,16 @@ def get_course_name(user_cache: dict[str, str]):
     assert all(
         field in user_cache for field in FORM_FIELDS
     ), "User cache does not contain all form fields"
-    return f"{user_cache[COLLEGE]} {user_cache[DEPARTMENT]}{user_cache[COURSE_NUM]} {user_cache[SECTION]}"
+    return f"{user_cache[Message.COLLEGE]} {user_cache[Message.DEPARTMENT]}{user_cache[Message.COURSE_NUM]} {user_cache[Message.SECTION]}"
 
 
 def get_subscription_md(user_cache: dict):
     """Format current subscription form data in markdown"""
     fields = {
-        COLLEGE: "College",
-        DEPARTMENT: "Department",
-        COURSE_NUM: "Course",
-        SECTION: "Section",
+        Message.COLLEGE: "College",
+        Message.DEPARTMENT: "Department",
+        Message.COURSE_NUM: "Course",
+        Message.SECTION: "Section",
     }
     result = ""
     for key, label in fields.items():
@@ -172,8 +186,8 @@ def get_subscription_md(user_cache: dict):
 
 def get_cred_text(user_cache: dict):
     """Format user credentials"""
-    username = user_cache.get(USERNAME, "")
-    password = user_cache.get(PASSWORD, "")
+    username = user_cache.get(Message.USERNAME, "")
+    password = user_cache.get(Message.PASSWORD, "")
     masked_password = "*" * len(password)
     privacy_note = "Note: Your credentials are only used to register for courses and are not stored.\n"
     return f"{privacy_note}\nUsername: {username}\nPassword(hidden): {masked_password}"
