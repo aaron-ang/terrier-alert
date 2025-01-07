@@ -540,22 +540,22 @@ def create_conversation_handlers() -> list[ConversationHandler]:
                 CommandHandler("cancel", cancel),
             ],
         ),
-        ConversationHandler(
-            entry_points=[CommandHandler("register", register)],
-            states={
-                InputStates.AWAIT_SELECTION: reg_sel_handlers,
-                InputStates.AWAIT_INPUT_USERNAME: [
-                    MessageHandler(filters.REPLY, save_username)
-                ],
-                InputStates.AWAIT_INPUT_PASSWORD: [
-                    MessageHandler(filters.REPLY, save_password)
-                ],
-            },
-            fallbacks=[
-                CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
-                CommandHandler("cancel", cancel),
-            ],
-        ),
+        # ConversationHandler(
+        #     entry_points=[CommandHandler("register", register)],
+        #     states={
+        #         InputStates.AWAIT_SELECTION: reg_sel_handlers,
+        #         InputStates.AWAIT_INPUT_USERNAME: [
+        #             MessageHandler(filters.REPLY, save_username)
+        #         ],
+        #         InputStates.AWAIT_INPUT_PASSWORD: [
+        #             MessageHandler(filters.REPLY, save_password)
+        #         ],
+        #     },
+        #     fallbacks=[
+        #         CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
+        #         CommandHandler("cancel", cancel),
+        #     ],
+        # ),
         ConversationHandler(
             entry_points=[CommandHandler("resubscribe", resubscribe_dialog)],
             states={

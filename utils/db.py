@@ -18,6 +18,7 @@ class Database:
     def __init__(self, env: str) -> None:
         mongo_client = MongoClient(os.getenv("MONGO_URL"), tlsCAFile=certifi.where())
         mongo_db = mongo_client.get_database(f"{env}_db")
+        self.env = env
         self.course_collection = mongo_db["courses"]
         self.user_collection = mongo_db["users"]
 
