@@ -269,10 +269,6 @@ def get_next_course_xpath(result_xpath: str):
     return result_xpath
 
 
-def kw_present(keywords: list[str], target: str):
-    return any(kw in target for kw in keywords)
-
-
 async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str]):
     """Notifies each user on Telegram and unsubscribes them from the course."""
     for uid in users:

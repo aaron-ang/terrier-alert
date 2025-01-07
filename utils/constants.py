@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import Enum, StrEnum
 
 
-class Environment(Enum):
+class Environment(StrEnum):
     PROD = "prod"
     DEV = "dev"
 

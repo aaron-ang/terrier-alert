@@ -2,6 +2,6 @@ certifi
 pendulum
 pymongo
 python-dotenv
-python-telegram-bot
+python-telegram-bot[ext]
 selenium
 webdriver-manager

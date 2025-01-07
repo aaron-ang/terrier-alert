@@ -84,7 +84,7 @@ def get_main_buttons(user_cache: dict):
         if field in user_cache:
             buttons[row][col] = InlineKeyboardButton(
                 text=text,
-                callback_data=getattr(InputStates, f"INPUT_{field.name.upper()}"),
+                callback_data=getattr(InputStates, f"INPUT_{field.name}"),
             )
 
     if all(field in user_cache for field in FORM_FIELDS):
