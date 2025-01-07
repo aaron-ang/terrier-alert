@@ -50,4 +50,13 @@ FORM_FIELDS = {
     Message.COURSE_NUM,
     Message.SECTION,
 }
+
 CRED_FIELDS = {Message.USERNAME, Message.PASSWORD}
+
+UID = "user"
+USER_LIST = "users"
+COURSE_NAME = "name"
+SEM_YEAR = "semester"
+IS_SUBSCRIBED = "is_subscribed"
+LAST_SUBSCRIBED = "last_subscribed"
+LAST_SUBSCRIPTION = "last_subscription"

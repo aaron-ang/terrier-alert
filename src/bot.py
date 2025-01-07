@@ -1,21 +1,30 @@
-import os
-import sys
-import re
+from __future__ import annotations
+
 import html
+import os
+import re
+import sys
 import traceback
+from typing import Any, Callable, TypeAlias, cast
+
 import pendulum
-from typing import cast
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardMarkup, ForceReply, Message, constants, error
+from telegram import (
+    ForceReply,
+    InlineKeyboardMarkup,
+    Message,
+    Update,
+    constants,
+    error,
+)
 from telegram.ext import (
-    filters,
-    Application,
     ApplicationBuilder,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     ConversationHandler,
-    CallbackQueryHandler,
     MessageHandler,
+    filters,
 )
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -24,8 +33,11 @@ from utils.constants import *
 from utils import conv
 from utils.db import Database
 
-load_dotenv()
+# Type aliases for better readability
+Handler: TypeAlias = Callable[[Update, ContextTypes.DEFAULT_TYPE], Any]
+UserCache: TypeAlias = dict[str, Any]
 
+load_dotenv()
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
 
 
@@ -33,7 +45,7 @@ FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
 
 
 def get_subscription_status(
-    user_cache: dict, context: ContextTypes.DEFAULT_TYPE
+    user_cache: UserCache, context: ContextTypes.DEFAULT_TYPE
 ) -> tuple[bool, pendulum.DateTime | None]:
     """Check user subscription and update cache"""
     user_id = str(context._user_id)
@@ -55,7 +67,7 @@ def get_subscription_status(
     return user_cache[Message.IS_SUBSCRIBED], user_cache[Message.LAST_SUBSCRIBED]
 
 
-def populate_cache(user_cache: dict, user_course: dict[str, str]):
+def populate_cache(user_cache: UserCache, user_course: dict[str, str]):
     """Update user cache with course information"""
     college, dep_num, section = user_course["name"].split()
     department, number = dep_num[:2], dep_num[2:]
@@ -66,7 +78,7 @@ def populate_cache(user_cache: dict, user_course: dict[str, str]):
     user_cache[Message.SECTION] = section
 
 
-async def clear_invalid_msg(user_cache: dict, context: ContextTypes.DEFAULT_TYPE):
+async def clear_invalid_msg(user_cache: UserCache, context: ContextTypes.DEFAULT_TYPE):
     if Message.INVALID_MSG_ID in user_cache:
         await context.bot.delete_message(
             context._chat_id, user_cache[Message.INVALID_MSG_ID]
@@ -84,7 +96,7 @@ async def start(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Starts the conversation and asks the user about their subscription"""
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     is_subscribed, last_subscribed = get_subscription_status(user_cache, context)
 
     # Check user constraints (subscription status and time)
@@ -146,7 +158,7 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     await query.answer()
 
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     user_cache[Message.COLLEGE] = query.data
 
     await query.edit_message_text(
@@ -161,7 +173,7 @@ async def await_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     """Ask user for custom input"""
     query = update.callback_query
     await query.answer()
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     await clear_invalid_msg(user_cache, context)
 
     keyword = ""
@@ -184,7 +196,7 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message
     await message.delete()
 
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     prompt_msg_id = user_cache.get(Message.PROMPT_MSG_ID, None)
     assert prompt_msg_id, "Prompt message ID not found"
     await context.bot.delete_message(context._chat_id, prompt_msg_id)
@@ -221,7 +233,7 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     await query.edit_message_text("Submitting...")
 
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
     curr_time = pendulum.now()
@@ -237,7 +249,7 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask user for confirmation to register"""
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     is_subscribed, last_subscribed = get_subscription_status(user_cache, context)
 
     if last_subscribed is None:
@@ -260,7 +272,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def update_credentials(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     cred_text = conv.get_cred_text(user_cache)
     reply_markup = InlineKeyboardMarkup(conv.get_cred_buttons(user_cache))
     if query := update.callback_query:
@@ -296,7 +308,7 @@ async def ask_credential(
     update: Update, context: ContextTypes.DEFAULT_TYPE, credential: str
 ):
     await update.callback_query.answer()
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     await clear_invalid_msg(user_cache, context)
     credential = "password" if credential == Message.PASSWORD else "username"
     prompt = await context.bot.send_message(
@@ -319,7 +331,7 @@ async def save_credential(
     update: Update, context: ContextTypes.DEFAULT_TYPE, credential: str
 ):
     message = update.message
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     user_cache_snapshot = user_cache.copy()
     user_cache[credential] = message.text
     await message.delete()
@@ -344,7 +356,7 @@ async def start_webdriver(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     try:
         await query.edit_message_text("Establishing connection...")
         await finder.register_course(DB.env, user_cache, query)
@@ -362,7 +374,7 @@ async def start_webdriver(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask user for confirmation to resubscribe"""
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     is_subscribed, _ = get_subscription_status(user_cache, context)
     if is_subscribed:
         course_name = conv.get_course_name(user_cache)
@@ -390,7 +402,7 @@ async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     last_subscribed_course = user_cache.get(Message.LAST_SUBSCRIPTION, "")
     assert last_subscribed_course, "Last subscribed course not found"
     user_id = str(context._user_id)
@@ -425,7 +437,7 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    user_cache = cast(dict, context.user_data)
+    user_cache = cast(UserCache, context.user_data)
     course_name = conv.get_course_name(user_cache)
     user_id = str(context._user_id)
     DB.unsubscribe(course_name, user_id)
@@ -445,7 +457,7 @@ async def await_feedback(update: Update, _: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         conv.FEEDBACK_TEXT, quote=True, reply_markup=ForceReply()
     )
-    return InputStates.InputStates.AWAIT_FEEDBACK
+    return InputStates.AWAIT_FEEDBACK
 
 
 async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -496,7 +508,93 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
-def main(env=Environment.PROD):
+def create_conversation_handlers() -> list[ConversationHandler]:
+    """Create all conversation handlers for the bot"""
+    subscription_pattern = f"^({InputStates.INPUT_DEPARTMENT}|{InputStates.INPUT_COURSE_NUM}|{InputStates.INPUT_SECTION})$"
+
+    subscription_sel_handlers = [
+        CallbackQueryHandler(await_college_input, f"^{InputStates.INPUT_COLLEGE}$"),
+        CallbackQueryHandler(await_custom_input, subscription_pattern),
+        CallbackQueryHandler(submit, f"^{InputStates.SUBMIT}$"),
+    ]
+
+    reg_sel_handlers = [
+        CallbackQueryHandler(update_credentials, f"^{InputStates.PROCEED}$"),
+        CallbackQueryHandler(request_username_input, f"^{InputStates.INPUT_USERNAME}$"),
+        CallbackQueryHandler(request_password_input, f"^{InputStates.INPUT_PASSWORD}$"),
+        CallbackQueryHandler(start_webdriver, f"^{InputStates.SUBMIT}$"),
+    ]
+
+    handlers = [
+        ConversationHandler(
+            entry_points=[CommandHandler("subscribe", subscribe)],
+            states={
+                InputStates.AWAIT_SELECTION: subscription_sel_handlers,
+                InputStates.AWAIT_CUSTOM_INPUT: [
+                    MessageHandler(filters.REPLY, save_custom_input)
+                ],
+            },
+            fallbacks=[
+                CallbackQueryHandler(save_college_input, "^[A-Z]{3}$"),
+                CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
+                CommandHandler("cancel", cancel),
+            ],
+        ),
+        ConversationHandler(
+            entry_points=[CommandHandler("register", register)],
+            states={
+                InputStates.AWAIT_SELECTION: reg_sel_handlers,
+                InputStates.AWAIT_INPUT_USERNAME: [
+                    MessageHandler(filters.REPLY, save_username)
+                ],
+                InputStates.AWAIT_INPUT_PASSWORD: [
+                    MessageHandler(filters.REPLY, save_password)
+                ],
+            },
+            fallbacks=[
+                CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
+                CommandHandler("cancel", cancel),
+            ],
+        ),
+        ConversationHandler(
+            entry_points=[CommandHandler("resubscribe", resubscribe_dialog)],
+            states={
+                InputStates.AWAIT_SELECTION: [
+                    CallbackQueryHandler(resubscribe, f"^{InputStates.PROCEED}$")
+                ],
+            },
+            fallbacks=[
+                CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
+                CommandHandler("cancel", cancel),
+            ],
+        ),
+        ConversationHandler(
+            entry_points=[CommandHandler("unsubscribe", unsubscribe_dialog)],
+            states={
+                InputStates.AWAIT_SELECTION: [
+                    CallbackQueryHandler(unsubscribe, f"^{InputStates.PROCEED}$")
+                ]
+            },
+            fallbacks=[
+                CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
+                CommandHandler("cancel", cancel),
+            ],
+        ),
+        ConversationHandler(
+            entry_points=[CommandHandler("feedback", await_feedback)],
+            states={
+                InputStates.AWAIT_FEEDBACK: [
+                    MessageHandler(filters.REPLY, save_feedback)
+                ]
+            },
+            fallbacks=[CommandHandler("cancel", cancel)],
+        ),
+    ]
+    return handlers
+
+
+def main(env=Environment.PROD) -> None:
+    """Initialize and start the bot"""
     print("Starting bot...")
     global DB
 
@@ -504,111 +602,25 @@ def main(env=Environment.PROD):
     bot_token = os.getenv(
         "TELEGRAM_TOKEN" if env == Environment.PROD else "TEST_TELEGRAM_TOKEN"
     )
-    application: Application = ApplicationBuilder().token(bot_token).build()
+    application = ApplicationBuilder().token(bot_token).build()
 
-    subscription_sel_handlers = [
-        CallbackQueryHandler(
-            await_college_input, pattern="^" + InputStates.INPUT_COLLEGE + "$"
-        ),
-        CallbackQueryHandler(
-            await_custom_input,
-            pattern=f"^({InputStates.INPUT_DEPARTMENT}|{InputStates.INPUT_COURSE_NUM}|{InputStates.INPUT_SECTION})$",
-        ),
-        CallbackQueryHandler(submit, pattern="^" + InputStates.SUBMIT + "$"),
-    ]
-    reg_sel_handlers = [
-        CallbackQueryHandler(
-            update_credentials, pattern="^" + InputStates.PROCEED + "$"
-        ),
-        CallbackQueryHandler(
-            request_username_input, pattern="^" + InputStates.INPUT_USERNAME + "$"
-        ),
-        CallbackQueryHandler(
-            request_password_input, pattern="^" + InputStates.INPUT_PASSWORD + "$"
-        ),
-        CallbackQueryHandler(start_webdriver, pattern="^" + InputStates.SUBMIT + "$"),
-    ]
+    # Add conversation handlers
+    for handler in create_conversation_handlers():
+        application.add_handler(handler)
 
-    subscription_handler = ConversationHandler(
-        entry_points=[CommandHandler("subscribe", subscribe)],
-        states={
-            InputStates.AWAIT_SELECTION: subscription_sel_handlers,
-            InputStates.AWAIT_CUSTOM_INPUT: [
-                MessageHandler(filters.REPLY, save_custom_input)
-            ],
-        },
-        fallbacks=[
-            CallbackQueryHandler(save_college_input, pattern="^[A-Z]{3}$"),
-            CallbackQueryHandler(cancel, pattern="^" + InputStates.CANCEL + "$"),
-            CommandHandler("cancel", cancel),
-        ],
-    )
-    register_handler = ConversationHandler(
-        entry_points=[CommandHandler("register", register)],
-        states={
-            InputStates.AWAIT_SELECTION: reg_sel_handlers,
-            InputStates.AWAIT_InputStates.INPUT_USERNAME: [
-                MessageHandler(filters.REPLY, save_username)
-            ],
-            InputStates.AWAIT_InputStates.INPUT_PASSWORD: [
-                MessageHandler(filters.REPLY, save_password)
-            ],
-        },
-        fallbacks=[
-            CallbackQueryHandler(cancel, pattern="^" + InputStates.CANCEL + "$"),
-            CommandHandler("cancel", cancel),
-        ],
-    )
-    resubscription_handler = ConversationHandler(
-        entry_points=[CommandHandler("resubscribe", resubscribe_dialog)],
-        states={
-            InputStates.AWAIT_SELECTION: [
-                CallbackQueryHandler(
-                    resubscribe, pattern="^" + InputStates.PROCEED + "$"
-                )
-            ],
-        },
-        fallbacks=[
-            CallbackQueryHandler(cancel, pattern="^" + InputStates.CANCEL + "$"),
-            CommandHandler("cancel", cancel),
-        ],
-    )
-    unsubscribe_handler = ConversationHandler(
-        entry_points=[CommandHandler("unsubscribe", unsubscribe_dialog)],
-        states={
-            InputStates.AWAIT_SELECTION: [
-                CallbackQueryHandler(
-                    unsubscribe, pattern="^" + InputStates.PROCEED + "$"
-                )
-            ]
-        },
-        fallbacks=[
-            CallbackQueryHandler(cancel, pattern="^" + InputStates.CANCEL + "$"),
-            CommandHandler("cancel", cancel),
-        ],
-    )
-    feedback_handler = ConversationHandler(
-        entry_points=[CommandHandler("feedback", await_feedback)],
-        states={
-            InputStates.InputStates.AWAIT_FEEDBACK: [
-                MessageHandler(filters.REPLY, save_feedback)
-            ]
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    unknown_handler = MessageHandler(filters.COMMAND, unknown)
+    # Add command handlers
+    for command, callback in [
+        ("start", start),
+        ("help", help),
+        ("about", about),
+    ]:
+        application.add_handler(CommandHandler(command, callback))
 
-    application.add_handler(subscription_handler)
-    application.add_handler(register_handler)
-    application.add_handler(resubscription_handler)
-    application.add_handler(unsubscribe_handler)
-    application.add_handler(feedback_handler)
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("help", help))
-    application.add_handler(CommandHandler("about", about))
-    application.add_handler(unknown_handler)
+    # Add fallback handlers
+    application.add_handler(MessageHandler(filters.COMMAND, unknown))
     application.add_error_handler(error_handler)
 
+    # Start job queue
     job_queue = application.job_queue
     job_queue.run_repeating(callback=finder.run, interval=60, data={"db": DB})
 

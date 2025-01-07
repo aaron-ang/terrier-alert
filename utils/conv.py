@@ -1,12 +1,12 @@
 """This module contains all the text and buttons used in the bot."""
 
 import os
+
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
 from utils.constants import *
 from utils.course import Course
-
 
 load_dotenv()
 
@@ -56,43 +56,35 @@ COLLEGES = ["CAS", "CDS", "COM", "ENG", "SAR", "QST", "CGS", "SPH", "SED", "PDP"
 
 
 def get_main_buttons(user_cache: dict):
-    """Return subscription form buttons"""
-    buttons = [
+    base_buttons = [
         [
-            InlineKeyboardButton(
-                text="Input College", callback_data=InputStates.INPUT_COLLEGE
-            ),
-            InlineKeyboardButton(
-                text="Input Department", callback_data=InputStates.INPUT_DEPARTMENT
-            ),
+            ("Input College", InputStates.INPUT_COLLEGE),
+            ("Input Department", InputStates.INPUT_DEPARTMENT),
         ],
         [
-            InlineKeyboardButton(
-                text="Input Course", callback_data=InputStates.INPUT_COURSE_NUM
-            ),
-            InlineKeyboardButton(
-                text="Input Section", callback_data=InputStates.INPUT_SECTION
-            ),
+            ("Input Course", InputStates.INPUT_COURSE_NUM),
+            ("Input Section", InputStates.INPUT_SECTION),
         ],
-        [InlineKeyboardButton(text="Cancel", callback_data=InputStates.CANCEL)],
+        [("Cancel", InputStates.CANCEL)],
     ]
 
-    for changed_fields in user_cache:
-        if changed_fields == Message.COLLEGE:
-            buttons[0][0] = InlineKeyboardButton(
-                text="Edit College", callback_data=InputStates.INPUT_COLLEGE
-            )
-        elif changed_fields == Message.DEPARTMENT:
-            buttons[0][1] = InlineKeyboardButton(
-                text="Edit Department", callback_data=InputStates.INPUT_DEPARTMENT
-            )
-        elif changed_fields == Message.COURSE_NUM:
-            buttons[1][0] = InlineKeyboardButton(
-                text="Edit Course", callback_data=InputStates.INPUT_COURSE_NUM
-            )
-        elif changed_fields == Message.SECTION:
-            buttons[1][1] = InlineKeyboardButton(
-                text="Edit Section", callback_data=InputStates.INPUT_SECTION
+    buttons = [
+        [InlineKeyboardButton(text=text, callback_data=data) for text, data in row]
+        for row in base_buttons
+    ]
+
+    button_mapping = {
+        Message.COLLEGE: ("Edit College", 0, 0),
+        Message.DEPARTMENT: ("Edit Department", 0, 1),
+        Message.COURSE_NUM: ("Edit Course", 1, 0),
+        Message.SECTION: ("Edit Section", 1, 1),
+    }
+
+    for field, (text, row, col) in button_mapping.items():
+        if field in user_cache:
+            buttons[row][col] = InlineKeyboardButton(
+                text=text,
+                callback_data=getattr(InputStates, f"INPUT_{field.name.upper()}"),
             )
 
     if all(field in user_cache for field in FORM_FIELDS):
@@ -137,16 +129,13 @@ def get_cred_buttons(user_cache: dict):
 
 def get_college_buttons():
     """Return college selection buttons"""
-    cols = 3
-    rows = []
-    for i in range(0, len(COLLEGES), cols):
-        rows.append(
-            [
-                InlineKeyboardButton(text=college, callback_data=college)
-                for college in COLLEGES[i : i + cols]
-            ]
-        )
-    return rows
+    return [
+        [
+            InlineKeyboardButton(text=college, callback_data=college)
+            for college in COLLEGES[i : i + 3]
+        ]
+        for i in range(0, len(COLLEGES), 3)
+    ]
 
 
 def get_confirmation_buttons():
