@@ -1,5 +1,6 @@
 certifi
 curl_cffi
+fastapi[standard]
 pendulum
 pydantic
 pymongo
@@ -7,6 +8,4 @@ pytest
 python-dotenv
 python-telegram-bot[ext]
 selenium
-starlette
-uvicorn
 webdriver_manager

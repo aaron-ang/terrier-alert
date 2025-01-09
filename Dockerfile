@@ -11,7 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy all files from build context to /app
 COPY . .
 
-CMD ["python3", "test/bot.py"]
+RUN ["chmod", "+x", "./src/main.sh"]
+
+CMD ./src/main.sh
 
 # docker compose build
 # docker compose up
