@@ -2,8 +2,8 @@ services:
   bot:
     build: .
     environment:
-      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
-      - TEST_TELEGRAM_TOKEN=${TEST_TELEGRAM_TOKEN}
-      - FEEDBACK_CHANNEL_ID=${FEEDBACK_CHANNEL_ID}
-      - MONGO_URL=${MONGO_URL}
-      - REPO_URL=${REPO_URL}
+      - TELEGRAM_TOKEN
+      - TEST_TELEGRAM_TOKEN
+      - FEEDBACK_CHANNEL_ID
+      - MONGO_URL
+      - REPO_URL
