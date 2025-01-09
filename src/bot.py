@@ -15,7 +15,6 @@ from telegram import (
     Message,
     Update,
     constants,
-    error,
 )
 from telegram.ext import (
     ApplicationBuilder,

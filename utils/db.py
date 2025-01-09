@@ -15,7 +15,7 @@ load_dotenv()
 
 
 class Database:
-    def __init__(self, env: str) -> None:
+    def __init__(self, env: Environment):
         mongo_client = MongoClient(os.getenv("MONGO_URL"), tlsCAFile=certifi.where())
         mongo_db = mongo_client.get_database(f"{env}_db")
         self.env = env
@@ -67,7 +67,7 @@ class Database:
         )
 
     def update_subscription_status(
-        self, uid: str, course_name: str, is_subscribed: bool
+        self, uid: str, last_subscribed: str, is_subscribed: bool
     ) -> None:
         """Update user's subscription status."""
         self.user_collection.update_one(
@@ -75,7 +75,7 @@ class Database:
             {
                 "$set": {
                     IS_SUBSCRIBED: is_subscribed,
-                    LAST_SUBSCRIPTION: course_name,
+                    LAST_SUBSCRIPTION: last_subscribed,
                 }
             },
             upsert=True,

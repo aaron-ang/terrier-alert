@@ -1,4 +1,5 @@
 certifi
+curl_cffi
 pendulum
 pymongo
 python-dotenv

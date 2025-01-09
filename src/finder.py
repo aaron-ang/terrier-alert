@@ -42,7 +42,7 @@ BOT = None
 timeout: Optional[pendulum.DateTime] = None
 
 
-def setup_chrome_options(env: str) -> webdriver.ChromeOptions:
+def setup_chrome_options(env: Environment) -> webdriver.ChromeOptions:
     """Configure Chrome options based on environment."""
     options = webdriver.ChromeOptions()
     options.add_argument("--no-sandbox")
@@ -59,7 +59,7 @@ def setup_chrome_options(env: str) -> webdriver.ChromeOptions:
 
 
 def init_driver(
-    env: str, wait_timeout: int = 30
+    env: Environment, wait_timeout: int = 30
 ) -> Tuple[webdriver.Chrome, WebDriverWait]:
     """Initialize Chrome driver with appropriate configuration."""
     options = setup_chrome_options(env)
@@ -71,7 +71,7 @@ def init_driver(
     return driver, wait
 
 
-async def register_course(env: str, user_cache: dict, query: CallbackQuery):
+async def register_course(env: Environment, user_cache: dict, query: CallbackQuery):
     """Regiser a course for the user, to be called by `bot.py`"""
     # Create one driver per task
     driver, wait = init_driver(env, wait_timeout=10)
