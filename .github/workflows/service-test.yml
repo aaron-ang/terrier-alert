@@ -33,13 +33,17 @@ jobs:
           # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
+      - name: Create .env file
+        run: |
+          cat << EOF > .env
+          TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
+          TEST_TELEGRAM_TOKEN=${{ secrets.TEST_TELEGRAM_TOKEN }}
+          FEEDBACK_CHANNEL_ID=${{ secrets.FEEDBACK_CHANNEL_ID }}
+          MONGO_URL=${{ secrets.MONGO_URL }}
+          GITHUB_URL=${{ github.server_url }}/${{ github.repository }}
+          EOF
+
       - name: Build and Test Service
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TEST_TELEGRAM_TOKEN: ${{ secrets.TEST_TELEGRAM_TOKEN }}
-          FEEDBACK_CHANNEL_ID: ${{ secrets.FEEDBACK_CHANNEL_ID }}
-          MONGO_URL: ${{ secrets.MONGO_URL }}
-          REPO_URL: ${{ vars.REPO_URL }}
         run: |
           docker compose build
           docker compose up -d
