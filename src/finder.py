@@ -39,7 +39,6 @@ DB: Optional[Database] = None
 DRIVER: Optional[webdriver.Chrome] = None
 WAIT: Optional[WebDriverWait] = None
 BOT = None
-timeout: Optional[pendulum.DateTime] = None
 
 
 def setup_chrome_options(env: Environment) -> webdriver.ChromeOptions:
@@ -254,13 +253,6 @@ async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str
         DB.unsubscribe(str(course), uid)
 
 
-async def notify_admin(msg: str):
-    """Sends a notification to Telegram feedback channel."""
-    await BOT.send_message(
-        FEEDBACK_CHANNEL_ID, msg, write_timeout=TimeConstants.TIMEOUT_SECONDS
-    )
-
-
 def driver_alive() -> bool:
     """Check if the WebDriver is still operational."""
     if DRIVER is None:
@@ -283,26 +275,5 @@ def init(context: ContextTypes.DEFAULT_TYPE):
 
 
 async def run(context: ContextTypes.DEFAULT_TYPE):
-    """Runs the finder every minute."""
-    global timeout
-
-    if (now := pendulum.now()).minute % 30 == 0:
-        print("Finder started at", now.to_rss_string())
-
     init(context)
-
-    try:
-        await search_courses()
-    except TimeoutException:
-        if timeout is None:
-            timeout = pendulum.now()
-        else:
-            minutes_since_last_timeout = pendulum.now().diff(timeout).in_minutes()
-            if minutes_since_last_timeout % 20 == 0:
-                await notify_admin(
-                    f"Finder timed out for {minutes_since_last_timeout} minutes."
-                )
-    except Exception as exc:
-        await notify_admin(repr(exc))
-    else:
-        timeout = None
+    await search_courses()

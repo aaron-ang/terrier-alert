@@ -13,7 +13,7 @@ COPY . .
 
 RUN ["chmod", "+x", "./src/main.sh"]
 
-CMD ./src/main.sh
+CMD ["./src/main.sh", "--test"]
 
 # docker compose build
 # docker compose up
