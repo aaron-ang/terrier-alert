@@ -2,7 +2,7 @@
 
 A Python service that collects class information at Boston University and sends a notification via [Telegram](https://telegram.org/) bot when a class is open.
 
-Deployed on Render[https://render.com/].
+Deployed on [Render](https://render.com/).
 
 ## Demo
 
