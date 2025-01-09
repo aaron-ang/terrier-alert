@@ -1,6 +1,7 @@
 certifi
 curl_cffi
 pendulum
+pydantic
 pymongo
 python-dotenv
 python-telegram-bot[ext]

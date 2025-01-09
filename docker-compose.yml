@@ -1,0 +1,9 @@
+services:
+  bot:
+    build: .
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TEST_TELEGRAM_TOKEN=${TEST_TELEGRAM_TOKEN}
+      - FEEDBACK_CHANNEL_ID=${FEEDBACK_CHANNEL_ID}
+      - MONGO_URL=${MONGO_URL}
+      - GITHUB_URL=${GITHUB_URL}
