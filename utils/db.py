@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from pymongo import MongoClient
 import certifi
 
-from utils.course import Course
+from utils.models import Course
 from utils.constants import *
 
 load_dotenv()

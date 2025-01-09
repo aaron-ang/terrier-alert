@@ -3,11 +3,14 @@
 from dataclasses import dataclass, field, InitVar
 
 import pendulum
+from curl_cffi import requests
+from pydantic import BaseModel
+
 
 # Base URLs for student portal
 BASE_BIN_URL = (
-    "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1"
-    "?ModuleName=univschr.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S"
+    "https://public.mybustudent.bu.edu/psc/BUPRD/EMPLOYEE/SA/s/WEBLIB_HCX_CM.H_CLASS_SEARCH.FieldFormula.IScript_ClassSearch?"
+    "institution=BU001"
 )
 BASE_REG_URL = (
     "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1"
@@ -51,12 +54,9 @@ class Course:
 
         # Build URL parameters
         params = (
-            f"&ViewSem={semester}+{year}"
-            f"&KeySem={year_num}{sem_code}"
-            f"&College={college}"
-            f"&Dept={department}"
-            f"&Course={number}"
-            f"&Section={section}"
+            f"&term=2251"  # TODO: figure out term code. Spring 2025: 2251
+            f"&subject={college}{department}"
+            f"&catalog_nbr={number}"
         )
 
         # Set all attributes
@@ -85,6 +85,32 @@ class Course:
         year = now.year + (1 if semester == "Spring" and now.month >= 10 else 0)
         return f"{semester} {year}"
 
-    def get_course_name(self) -> str:
+    def _course_name(self) -> str:
         """Returns the standardized course name string."""
         return f"{self.college} {self.department}{self.number} {self.section}"
+
+    def __repr__(self) -> str:
+        return self._course_name()
+
+
+class CourseResponse(BaseModel):
+    class_section: str
+    subject: str
+    catalog_nbr: str
+    wait_tot: int
+    enrollment_available: int
+
+
+def get_course_section(course: Course):
+    response = requests.get(course.bin_url, impersonate="chrome")
+    response.raise_for_status()
+    data: list = response.json()
+
+    try:
+        course_section = next(x for x in data if x["class_section"] == course.section)
+    except StopIteration:
+        first_section = data[0]
+        first_section = f"{first_section['subject']} {first_section['catalog_nbr']} {first_section['class_section']}"
+        raise ValueError(f"{course} was not found. Did you mean {first_section}?")
+
+    return CourseResponse(**course_section)

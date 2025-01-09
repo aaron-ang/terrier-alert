@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
 from utils.constants import *
-from utils.course import Course
+from utils.models import Course
 
 load_dotenv()
 
@@ -42,7 +42,7 @@ HELP_MD = (
 )
 ABOUT_MD = (
     "Terrier Alert is built with "
-    "*python\-telegram\-bot*, *PyMongo*, *Selenium WebDriver*, and *Heroku*\. "
+    "*python\-telegram\-bot*, *PyMongo*, and is hosted on *Render*\. "
     f"Check out the code [here]({GITHUB_URL})\."
 )
 UNKNOWN_CMD_TEXT = (

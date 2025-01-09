@@ -1,8 +1,8 @@
 # Terrier Alert
 
-A Python Selenium script which scrapes BU's course portal for specific classes and sends a notification via [Telegram](https://telegram.org/) bot when a class is open.
+A Python service that collects class information at Boston University and sends a notification via [Telegram](https://telegram.org/) bot when a class is open.
 
-Deployed to Heroku.
+Deployed on Render[https://render.com/].
 
 ## Demo
 

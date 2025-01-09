@@ -1,4 +1,4 @@
-from enum import Enum, StrEnum
+from enum import IntEnum, StrEnum
 
 
 class Environment(StrEnum):
@@ -6,12 +6,12 @@ class Environment(StrEnum):
     DEV = "dev"
 
 
-class TimeConstants(Enum):
+class TimeConstants(IntEnum):
     REFRESH_TIME_HOURS = 24
     TIMEOUT_SECONDS = 5
 
 
-class InputStates(Enum):
+class InputStates(IntEnum):
     AWAIT_SELECTION = 1
     AWAIT_CUSTOM_INPUT = 2
     AWAIT_INPUT_USERNAME = 3
@@ -28,7 +28,7 @@ class InputStates(Enum):
     CANCEL = 14
 
 
-class Message(Enum):
+class Message(IntEnum):
     COLLEGE = 1
     DEPARTMENT = 2
     COURSE_NUM = 3

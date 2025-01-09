@@ -22,7 +22,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # Local imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.constants import *
-from utils.course import Course
+from utils.models import Course, get_course_section
 from utils.db import Database
 
 # Constants
@@ -52,7 +52,6 @@ def setup_chrome_options(env: str) -> webdriver.ChromeOptions:
     options.add_experimental_option("useAutomationExtension", False)
 
     if env == Environment.PROD:
-        options.binary_location = os.getenv("GOOGLE_CHROME_BIN")
         options.add_argument("--start-maximized")
         options.add_argument("--headless=new")
 
@@ -64,30 +63,12 @@ def init_driver(
 ) -> Tuple[webdriver.Chrome, WebDriverWait]:
     """Initialize Chrome driver with appropriate configuration."""
     options = setup_chrome_options(env)
-    chrome_path = (
-        os.getenv("CHROMEDRIVER_PATH")
-        if env == Environment.PROD
-        else ChromeDriverManager().install()
-    )
-
     driver = webdriver.Chrome(
-        service=Service(executable_path=chrome_path), options=options
+        service=Service(executable_path=ChromeDriverManager().install()),
+        options=options,
     )
     wait = WebDriverWait(driver, timeout=wait_timeout)
     return driver, wait
-
-
-def driver_alive() -> bool:
-    """Check if the WebDriver is still operational."""
-    if DRIVER is None:
-        return False
-    try:
-        return (
-            DRIVER.service.is_connectable()
-            and DRIVER.service.assert_process_still_running() is None
-        )
-    except WebDriverException:
-        return False
 
 
 async def register_course(env: str, user_cache: dict, query: CallbackQuery):
@@ -178,7 +159,7 @@ async def search_courses() -> None:
         users = list(course_doc["users"])
 
         if not users:
-            DB.remove_course(course.get_course_name())
+            DB.remove_course(str(course))
             continue
 
         if course_doc["semester"] != Course.get_sem_year():
@@ -201,24 +182,17 @@ async def handle_expired_semester(
 
 async def process_course(course: Course, users: list[str]):
     """Checks for edge cases and course availability. Handles notifications for each case."""
-    DRIVER.get(course.bin_url)
-    WAIT.until(
-        EC.visibility_of_element_located((By.XPATH, "/html/body/table[4]/tbody"))
-    )
+    try:
+        course_response = get_course_section(course)
+    except ValueError as exc:
+        await notify_users_and_unsubscribe(course, str(exc), users)
+        return
 
-    # Check for pinned message
-    pinned_xpath = "/html/body/table[4]/tbody/tr[2]/td[1]/font/table/tbody/tr/td[1]/img"
-    result_row_index = 3 if DRIVER.find_elements(By.XPATH, pinned_xpath) else 2
-    result_xpath = f"/html/body/table[4]/tbody/tr[{result_row_index}]"
-
-    # Check validity of course
-    course_name_web = DRIVER.find_element(By.XPATH, result_xpath + "/td[2]/font/a").text
-    course_name_db = course.get_course_name()
-    if course_name_db != course_name_web:
-        msg = f"{course_name_db} was not found in the University Class Schedule. Did you mean {course_name_web}?"
-        await notify_users_and_unsubscribe(course, msg, users)
-    elif check_course_status(result_xpath, course_name_db):
-        msg = f"{course_name_db} is now available! Use /register to add it to your schedule."
+    if course_response.enrollment_available > 0:
+        waitlist_cnt = course_response.wait_tot
+        msg = (
+            f"{course} is now available! (with {waitlist_cnt} students on the waitlist)"
+        )
         await notify_users_and_unsubscribe(course, msg, users)
 
 
@@ -277,7 +251,7 @@ async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str
             text=msg,
             write_timeout=TimeConstants.TIMEOUT_SECONDS,
         )
-        DB.unsubscribe(course.get_course_name(), uid)
+        DB.unsubscribe(str(course), uid)
 
 
 async def notify_admin(msg: str):
@@ -304,8 +278,8 @@ def init(context: ContextTypes.DEFAULT_TYPE):
     global BOT, DB, DRIVER, WAIT
     BOT = context.bot
     DB = context.job.data["db"]
-    if not driver_alive():
-        DRIVER, WAIT = init_driver(DB.env)
+    # if not driver_alive():
+    #     DRIVER, WAIT = init_driver(DB.env)
 
 
 async def run(context: ContextTypes.DEFAULT_TYPE):

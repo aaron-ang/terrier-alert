@@ -134,7 +134,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for key in CRED_FIELDS:
         context.user_data.pop(key, None)
 
-    abort_msg = "Transaction aborted."
+    abort_msg = "Aborted."
     if query := update.callback_query:
         await query.answer()
         await cast(Message, update.effective_message).edit_text(abort_msg)
@@ -177,11 +177,12 @@ async def await_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await clear_invalid_msg(user_cache, context)
 
     keyword = ""
-    if query.data == InputStates.INPUT_DEPARTMENT:
+    query_data = int(query.data)
+    if query_data == InputStates.INPUT_DEPARTMENT:
         keyword = "department"
-    elif query.data == InputStates.INPUT_COURSE_NUM:
+    elif query_data == InputStates.INPUT_COURSE_NUM:
         keyword = "course number"
-    elif query.data == InputStates.INPUT_SECTION:
+    elif query_data == InputStates.INPUT_SECTION:
         keyword = "section"
 
     prompt = await context.bot.send_message(
@@ -488,24 +489,22 @@ async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(conv.UNKNOWN_CMD_TEXT, quote=True)
 
 
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
+async def error_handler(_update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send an error notification to Telegram feedback channel."""
     tb_list = traceback.format_exception(
         None, context.error, context.error.__traceback__
     )
     tb_string = "".join(tb_list)
-    message = (
-        "An exception was raised while handling an update\n"
-        f"<pre>{html.escape(tb_string)}</pre>"
+    print(tb_string)
+    message = "An exception was raised while handling an update\n" "<pre>{tb}</pre>"
+    message_len_limit = 4096
+    await context.bot.send_message(
+        chat_id=FEEDBACK_CHANNEL_ID,
+        text=message.format(
+            tb=html.escape(tb_string[: message_len_limit - len(message)])
+        ),
+        parse_mode=constants.ParseMode.HTML,
     )
-    if isinstance(context.error, error.Conflict):
-        print(message)
-    else:
-        await context.bot.send_message(
-            chat_id=FEEDBACK_CHANNEL_ID,
-            text=message,
-            parse_mode=constants.ParseMode.HTML,
-        )
 
 
 def create_conversation_handlers() -> list[ConversationHandler]:
@@ -540,22 +539,22 @@ def create_conversation_handlers() -> list[ConversationHandler]:
                 CommandHandler("cancel", cancel),
             ],
         ),
-        # ConversationHandler(
-        #     entry_points=[CommandHandler("register", register)],
-        #     states={
-        #         InputStates.AWAIT_SELECTION: reg_sel_handlers,
-        #         InputStates.AWAIT_INPUT_USERNAME: [
-        #             MessageHandler(filters.REPLY, save_username)
-        #         ],
-        #         InputStates.AWAIT_INPUT_PASSWORD: [
-        #             MessageHandler(filters.REPLY, save_password)
-        #         ],
-        #     },
-        #     fallbacks=[
-        #         CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
-        #         CommandHandler("cancel", cancel),
-        #     ],
-        # ),
+        ConversationHandler(
+            entry_points=[CommandHandler("register", register)],
+            states={
+                InputStates.AWAIT_SELECTION: reg_sel_handlers,
+                InputStates.AWAIT_INPUT_USERNAME: [
+                    MessageHandler(filters.REPLY, save_username)
+                ],
+                InputStates.AWAIT_INPUT_PASSWORD: [
+                    MessageHandler(filters.REPLY, save_password)
+                ],
+            },
+            fallbacks=[
+                CallbackQueryHandler(cancel, f"^{InputStates.CANCEL}$"),
+                CommandHandler("cancel", cancel),
+            ],
+        ),
         ConversationHandler(
             entry_points=[CommandHandler("resubscribe", resubscribe_dialog)],
             states={
