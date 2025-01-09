@@ -13,6 +13,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    environment: staging
+
     steps:
       - uses: actions/checkout@v4
 
@@ -42,10 +44,6 @@ jobs:
           MONGO_URL=${{ secrets.MONGO_URL }}
           REPO_URL=${{ github.server_url }}/${{ github.repository }}
           EOF
-
-          # Debug: Show env file (with secrets masked)
-          echo "=== ENV FILE CREATED ==="
-          cat .env | sed 's/mongodb+srv:\/\/[^@]*@/mongodb+srv:\/\/****@/'
 
       - name: Build and Test Service
         run: |
