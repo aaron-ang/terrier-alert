@@ -40,12 +40,12 @@ jobs:
           TEST_TELEGRAM_TOKEN=${{ secrets.TEST_TELEGRAM_TOKEN }}
           FEEDBACK_CHANNEL_ID=${{ secrets.FEEDBACK_CHANNEL_ID }}
           MONGO_URL=${{ secrets.MONGO_URL }}
-          GITHUB_URL=${{ github.server_url }}/${{ github.repository }}
+          REPO_URL=${{ github.server_url }}/${{ github.repository }}
           EOF
 
           # Debug: Show file location and contents
           pwd
-          ls -la .env
+          ls -la
 
       - name: Build and Test Service
         run: |
