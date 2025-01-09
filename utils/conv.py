@@ -10,7 +10,7 @@ from utils.models import Course
 
 load_dotenv()
 
-GITHUB_URL = os.getenv("GITHUB_URL")
+REPO_URL = os.getenv("REPO_URL")
 WELCOME_TEXT = (
     f"Welcome to Terrier Alert {Course.get_sem_year()}!\n"
     "Use the Menu button to get started."
@@ -43,7 +43,7 @@ HELP_MD = (
 ABOUT_MD = (
     "Terrier Alert is built with "
     "*python\-telegram\-bot*, *PyMongo*, and is hosted on *Render*\. "
-    f"Check out the code [here]({GITHUB_URL})\."
+    f"Check out the code [here]({REPO_URL})\."
 )
 UNKNOWN_CMD_TEXT = (
     "Sorry, I didn't understand that command. If you are currently in a subscription conversation, "
