@@ -39,13 +39,9 @@ jobs:
           TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
           TEST_TELEGRAM_TOKEN=${{ secrets.TEST_TELEGRAM_TOKEN }}
           FEEDBACK_CHANNEL_ID=${{ secrets.FEEDBACK_CHANNEL_ID }}
-          MONGO_URL=${{ secrets.MONGO_URL }}
+          MONGO_URL='${{ secrets.MONGO_URL }}'
           REPO_URL=${{ github.server_url }}/${{ github.repository }}
           EOF
-
-          # Debug: Show file location and contents
-          pwd
-          ls -la
 
       - name: Build and Test Service
         run: |
