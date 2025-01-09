@@ -43,6 +43,10 @@ jobs:
           GITHUB_URL=${{ github.server_url }}/${{ github.repository }}
           EOF
 
+          # Debug: Show file location and contents
+          pwd
+          ls -la .env
+
       - name: Build and Test Service
         run: |
           docker compose build
