@@ -1,5 +1,7 @@
 FROM python:3.11-slim
 
+EXPOSE 8000
+
 WORKDIR /app
 
 COPY requirements.txt .
@@ -13,3 +15,4 @@ CMD ["python3", "test/bot.py"]
 
 # docker compose build
 # docker compose up
+# docker system prune
