@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import asyncio
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src import bot
@@ -13,4 +14,4 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == "__main__":
-    bot.main(Environment.DEV)
+    asyncio.run(bot.main(Environment.DEV))

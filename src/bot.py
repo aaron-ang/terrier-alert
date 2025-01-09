@@ -5,10 +5,16 @@ import os
 import re
 import sys
 import traceback
+import asyncio
 from typing import Any, Callable, TypeAlias, cast
 
 import pendulum
 from dotenv import load_dotenv
+import uvicorn
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse, Response
+from starlette.routing import Route
 from telegram import (
     ForceReply,
     InlineKeyboardMarkup,
@@ -37,6 +43,7 @@ Handler: TypeAlias = Callable[[Update, ContextTypes.DEFAULT_TYPE], Any]
 UserCache: TypeAlias = dict[str, Any]
 
 load_dotenv()
+
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
 
 
@@ -591,7 +598,7 @@ def create_conversation_handlers() -> list[ConversationHandler]:
     return handlers
 
 
-def main(env=Environment.PROD) -> None:
+async def main(env=Environment.PROD) -> None:
     """Initialize and start the bot"""
     print("Starting bot...")
     global DB
@@ -622,8 +629,28 @@ def main(env=Environment.PROD) -> None:
     job_queue = application.job_queue
     job_queue.run_repeating(callback=finder.run, interval=60, data={"db": DB})
 
-    application.run_polling()
+    async def ping(_: Request) -> Response:
+        return PlainTextResponse("Pong")
+
+    starlette_app = Starlette(
+        routes=[
+            Route("/ping", ping, methods=["GET"]),
+        ]
+    )
+    webserver = uvicorn.Server(
+        config=uvicorn.Config(
+            app=starlette_app,
+            host="0.0.0.0",
+            port=8000,
+            use_colors=False,
+        )
+    )
+
+    async with application:
+        await application.start()
+        await webserver.serve()
+        await application.stop()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

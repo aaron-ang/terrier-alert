@@ -3,7 +3,10 @@ curl_cffi
 pendulum
 pydantic
 pymongo
+pytest
 python-dotenv
 python-telegram-bot[ext]
 selenium
-webdriver-manager
+starlette
+uvicorn
+webdriver_manager

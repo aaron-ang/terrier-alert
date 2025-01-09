@@ -7,3 +7,5 @@ services:
       - FEEDBACK_CHANNEL_ID
       - MONGO_URL
       - REPO_URL
+    ports:
+      - "8000:8000"
