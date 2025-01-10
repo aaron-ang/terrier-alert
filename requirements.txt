@@ -7,5 +7,3 @@ pymongo
 pytest
 python-dotenv
 python-telegram-bot[ext]
-selenium
-webdriver_manager
