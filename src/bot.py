@@ -54,11 +54,11 @@ def get_subscription_status(
     user_id = str(context._user_id)
     user = DB.get_user(user_id)
 
-    user_cache[Message.IS_SUBSCRIBED] = user["is_subscribed"] if user else False
+    user_cache[Message.IS_SUBSCRIBED] = user[IS_SUBSCRIBED] if user else False
     user_cache[Message.LAST_SUBSCRIBED] = (
-        pendulum.instance(user["last_subscribed"]) if user else None
+        pendulum.instance(user[LAST_SUBSCRIBED]) if user else None
     )
-    user_cache[Message.LAST_SUBSCRIPTION] = user["last_subscription"] if user else ""
+    user_cache[Message.LAST_SUBSCRIPTION] = user[LAST_SUBSCRIPTION] if user else ""
 
     if not user_cache[Message.IS_SUBSCRIBED]:
         for key in FORM_FIELDS:
@@ -72,7 +72,7 @@ def get_subscription_status(
 
 def populate_cache(user_cache: UserCache, user_course: dict[str, str]):
     """Update user cache with course information"""
-    college, dep_num, section = user_course["name"].split()
+    college, dep_num, section = user_course[COURSE_NAME].split()
     department, number = dep_num[:2], dep_num[2:]
 
     user_cache[Message.COLLEGE] = college

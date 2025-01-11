@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 sys.path.append("./")
 from src.db import Database
-from utils.constants import Environment, TimeConstants
+from utils.constants import Environment, TimeConstants, UID
 
 
 async def send_maintenance_announcement():
@@ -49,7 +49,7 @@ async def broadcast_message(message):
     for user in DB.get_all_users():
         try:
             msg: Message = await BOT.send_message(
-                user["user"],
+                user[UID],
                 message,
                 parse_mode="Markdown",
                 write_timeout=TimeConstants.TIMEOUT_SECONDS,

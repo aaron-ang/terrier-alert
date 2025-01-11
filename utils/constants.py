@@ -55,6 +55,7 @@ CRED_FIELDS = {Message.USERNAME, Message.PASSWORD}
 
 UID = "user"
 USER_LIST = "users"
+COURSE_LIST = "courses"
 COURSE_NAME = "name"
 SEM_YEAR = "semester"
 IS_SUBSCRIBED = "is_subscribed"
