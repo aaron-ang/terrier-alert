@@ -7,6 +7,7 @@ import sys
 import traceback
 from typing import Any, Callable, TypeAlias, cast
 
+import argparse
 import pendulum
 from dotenv import load_dotenv
 from telegram import (
@@ -27,14 +28,17 @@ from telegram.ext import (
 )
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.db import Database
 from src import finder
 from utils.constants import *
 from utils import conv
-from utils.db import Database
 
 # Type aliases for better readability
 Handler: TypeAlias = Callable[[Update, ContextTypes.DEFAULT_TYPE], Any]
 UserCache: TypeAlias = dict[str, Any]
+
+# Initialize DB at module level
+DB = None
 
 load_dotenv()
 FEEDBACK_CHANNEL_ID = str(os.getenv("FEEDBACK_CHANNEL_ID"))
@@ -125,21 +129,6 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_cache[Message.SUBSCRIPTION_MSG_ID] = conv_message.message_id
 
     return InputStates.AWAIT_SELECTION
-
-
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Cancels and ends the conversation"""
-    await clear_invalid_msg(context.user_data, context)
-    for key in CRED_FIELDS:
-        context.user_data.pop(key, None)
-
-    abort_msg = "Aborted."
-    if query := update.callback_query:
-        await query.answer()
-        await cast(Message, update.effective_message).edit_text(abort_msg)
-    else:
-        await context.bot.send_message(context._chat_id, abort_msg)
-    return ConversationHandler.END
 
 
 async def await_college_input(update: Update, _: ContextTypes.DEFAULT_TYPE):
@@ -241,7 +230,7 @@ async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_cache[Message.IS_SUBSCRIBED] = True
     user_cache[Message.LAST_SUBSCRIBED] = curr_time
-    await cast(Message, update.effective_message).reply_text(
+    await update.effective_message.reply_text(
         f"You are now subscribed to {course_name}."
     )
     return ConversationHandler.END
@@ -411,7 +400,7 @@ async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_cache[Message.IS_SUBSCRIBED] = True
     user_cache[Message.LAST_SUBSCRIBED] = curr_time
-    await cast(Message, update.effective_message).edit_text(
+    await update.effective_message.edit_text(
         f"Successfully resubscribed to {last_subscribed_course}."
     )
     return ConversationHandler.END
@@ -446,7 +435,7 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_cache.pop(key, None)
     user_cache[Message.IS_SUBSCRIBED] = False
 
-    await cast(Message, update._effective_message).edit_text(
+    await update._effective_message.edit_text(
         f"You have been unsubscribed from {course_name}."
     )
     return ConversationHandler.END
@@ -476,6 +465,21 @@ async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def help(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/help` command"""
     await update.message.reply_markdown_v2(conv.HELP_MD, quote=True)
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancels and ends the conversation"""
+    await clear_invalid_msg(context.user_data, context)
+    for key in CRED_FIELDS:
+        context.user_data.pop(key, None)
+
+    abort_msg = "Aborted."
+    if query := update.callback_query:
+        await query.answer()
+        await update.effective_message.edit_text(abort_msg)
+    else:
+        await context.bot.send_message(context._chat_id, abort_msg)
+    return ConversationHandler.END
 
 
 async def about(update: Update, _: ContextTypes.DEFAULT_TYPE):
@@ -596,7 +600,9 @@ def main(env=Environment.PROD) -> None:
     print("Starting bot...")
     global DB
 
-    DB = Database(env)
+    if not DB:
+        DB = Database(env)
+
     bot_token = os.getenv(
         "TELEGRAM_TOKEN" if env == Environment.PROD else "TEST_TELEGRAM_TOKEN"
     )
@@ -626,4 +632,14 @@ def main(env=Environment.PROD) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Run the bot")
+    parser.add_argument(
+        "--dev",
+        action="store_const",
+        const=Environment.DEV,
+        default=Environment.PROD,
+        help="Run the bot in development mode",
+        dest="env",
+    )
+    args = parser.parse_args()
+    main(args.env)

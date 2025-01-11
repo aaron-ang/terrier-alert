@@ -1,7 +1,7 @@
 import sys
 
 sys.path.append("./")
-from utils.db import Database
+from src.db import Database
 from src.bot import Environment
 
 

@@ -4,13 +4,9 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 python -m fastapi run $SCRIPT_DIR/server.py &
 
-if [ "$1" == "--test" ]; then
-    BOT_PROGRAM="$(dirname $SCRIPT_DIR)/test/bot.py"
-else
-    BOT_PROGRAM="$SCRIPT_DIR/bot.py"
-fi
+BOT_PROGRAM="$SCRIPT_DIR/bot.py"
 
-python $BOT_PROGRAM &
+python $BOT_PROGRAM $1 &
 
 wait -n
 

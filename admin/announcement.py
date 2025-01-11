@@ -3,13 +3,12 @@
 import os
 import sys
 import asyncio
-from datetime import datetime
 import telegram
 from telegram import Message
 from dotenv import load_dotenv
 
 sys.path.append("./")
-from utils.db import Database
+from src.db import Database
 from utils.constants import Environment, TimeConstants
 
 

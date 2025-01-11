@@ -9,9 +9,9 @@ from telegram.ext import ContextTypes
 
 # Local imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.db import Database
 from utils.constants import *
 from utils.models import Course, get_course_section
-from utils.db import Database
 
 # Constants
 load_dotenv()
