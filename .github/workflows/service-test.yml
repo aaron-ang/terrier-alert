@@ -52,6 +52,8 @@ jobs:
 
       - name: Build and Test Service
         run: |
+          podman machine init
+          podman machine start
           podman compose up -d
 
           START_TIME=$(date +%s)
