@@ -1,6 +1,8 @@
 services:
   bot:
-    build: .
+    build:
+      context: .
+      dockerfile: Containerfile
     environment:
       - TELEGRAM_TOKEN
       - TEST_TELEGRAM_TOKEN
