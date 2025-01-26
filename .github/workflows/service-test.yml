@@ -52,7 +52,6 @@ jobs:
 
       - name: Build and Test Service
         run: |
-          docker compose build
           docker compose up -d
 
           START_TIME=$(date +%s)
