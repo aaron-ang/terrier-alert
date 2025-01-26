@@ -52,20 +52,19 @@ jobs:
 
       - name: Build and Test Service
         run: |
-          docker compose build
-          docker compose up -d
+          podman compose up -d
 
           START_TIME=$(date +%s)
           END_TIME=$((START_TIME + 90))
 
           while [ $(date +%s) -lt $END_TIME ]; do
-            if ! docker ps | grep -q terrier-alert; then
+            if ! podman ps | grep -q terrier-alert; then
               echo "Service crashed!"
-              docker compose logs
+              podman compose logs
               exit 1
             fi
             sleep 5
           done
 
           echo "Service ran stable for 1.5 minutes"
-          docker compose down
+          podman compose down
