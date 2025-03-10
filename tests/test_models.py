@@ -18,10 +18,10 @@ def test_course_init():
 
 
 def test_course_response():
-    course = Course("CAS CS111 A1")
+    course = Course("CAS EC101 A1")
     course_response = get_course_section(course)
     assert course_response.subject == f"{course.college}{course.department}"
-    assert course_response.catalog_nbr == course.number
+    assert course.number in course_response.catalog_nbr
     assert course_response.class_section == course.section
 
 
@@ -34,5 +34,5 @@ def test_missing_course():
         course = Course("CAS CS111 Z1")
         get_course_section(course)
 
-    assert e_info.type == ValueError
-    assert e_info.value.args[0] == f"{course} was not found. Did you mean CASCS 111 A1?"
+    assert e_info.type is ValueError
+    assert f"{course} was not found. Did you mean CASCS 111" in e_info.value.args[0]

@@ -6,6 +6,12 @@ import pendulum
 from curl_cffi import requests
 from pydantic import BaseModel
 
+from utils.constants import (
+    FALL_SEMESTER,
+    SPRING_SEMESTER,
+    SUMMER_SEMESTER,
+)
+
 
 # Base URLs for student portal
 BASE_BIN_URL = (
@@ -36,8 +42,7 @@ class Course:
     number: str = field(init=False)
     section: str = field(init=False)
     year: int = field(init=False)
-    sem_code: int = field(init=False)
-    formatted_params: str = field(init=False)
+    term_code: str = field(init=False)
     bin_url: str = field(init=False)
     reg_url: str = field(init=False)
     reg_option_url: str = field(init=False)
@@ -49,51 +54,55 @@ class Course:
 
         # Get semester info
         semester, year = self.get_sem_year().split()
-        year_num = int(year) + (1 if semester == "Fall" else 0)
-        sem_code = 3 if semester == "Fall" else 4
+        year_num = int(year)
+        sem_code = {FALL_SEMESTER: 8, SPRING_SEMESTER: 1, SUMMER_SEMESTER: 5}[semester]
+        term_code = f"{year_num // 1000}{year_num % 1000}{sem_code}"
 
-        # Build URL parameters
-        params = (
-            f"&term=2251"  # TODO: figure out term code. Spring 2025: 2251
-            f"&subject={college}{department}"
-            f"&catalog_nbr={number}"
-        )
+        # Build URL parameter string
+        params = f"&term={term_code}&subject={college}{department}&catalog_nbr={number}"
 
         # Set all attributes
-        for name, value in {
+        attrs = {
             "college": college.upper(),
             "department": department.upper(),
             "number": number,
             "section": section.upper(),
             "year": year_num,
-            "sem_code": sem_code,
-            "formatted_params": params,
+            "term_code": term_code,
             "bin_url": BASE_BIN_URL + params,
             "reg_url": BASE_REG_URL + params,
             "reg_option_url": BASE_REG_OPTION_URL + params,
-        }.items():
+        }
+
+        for name, value in attrs.items():
             object.__setattr__(self, name, value)
 
     @staticmethod
     def get_sem_year() -> str:
-        """Returns the current academic semester and year.
-
-        Format: "<Semester> <Year>" where Semester is Fall/Spring
-        """
+        """Returns the current academic semester and year as a tuple."""
         now = pendulum.now()
-        semester = "Fall" if 4 <= now.month <= 9 else "Spring"
-        year = now.year + (1 if semester == "Spring" and now.month >= 10 else 0)
+        month = now.month
+        year = now.year
+
+        if 4 <= month <= 9:
+            semester = FALL_SEMESTER
+        elif month > 9 or month <= 2:
+            semester = SPRING_SEMESTER
+        else:
+            semester = SUMMER_SEMESTER
+
+        if semester == SPRING_SEMESTER and month >= 10:
+            year += 1
+
         return f"{semester} {year}"
 
-    def _course_name(self) -> str:
-        """Returns the standardized course name string."""
-        return f"{self.college} {self.department}{self.number} {self.section}"
-
     def __repr__(self) -> str:
-        return self._course_name()
+        return f"{self.college} {self.department}{self.number} {self.section}"
 
 
 class CourseResponse(BaseModel):
+    """Model representing course information from the API response."""
+
     class_section: str
     subject: str
     catalog_nbr: str
@@ -101,16 +110,31 @@ class CourseResponse(BaseModel):
     enrollment_available: int
 
 
-def get_course_section(course: Course):
+def get_course_section(course: Course) -> CourseResponse:
+    """Fetches course section information from BU's API.
+
+    Args:
+        course: The Course object to query
+
+    Returns:
+        CourseResponse with section information
+
+    Raises:
+        ValueError: If the specified section is not found
+    """
     response = requests.get(course.bin_url, impersonate="chrome")
     response.raise_for_status()
-    data: list = response.json()
+    classes: list = response.json()["classes"]
 
     try:
-        course_section = next(x for x in data if x["class_section"] == course.section)
+        course_section = next(
+            x for x in classes if x["class_section"] == course.section
+        )
     except StopIteration:
-        first_section = data[0]
-        first_section = f"{first_section['subject']} {first_section['catalog_nbr']} {first_section['class_section']}"
-        raise ValueError(f"{course} was not found. Did you mean {first_section}?")
+        error_msg = f"{course} was not found."
+        if classes and (first_section := classes[0]):
+            section_name = f"{first_section['subject']} {first_section['catalog_nbr']} {first_section['class_section']}"
+            error_msg += f" Did you mean {section_name}?"
+        raise ValueError(error_msg)
 
     return CourseResponse(**course_section)
