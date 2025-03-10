@@ -41,34 +41,27 @@ class Course:
     department: str = field(init=False)
     number: str = field(init=False)
     section: str = field(init=False)
-    year: int = field(init=False)
-    term_code: str = field(init=False)
     bin_url: str = field(init=False)
     reg_url: str = field(init=False)
     reg_option_url: str = field(init=False)
 
-    def __post_init__(self, course_name: str) -> None:
+    def __post_init__(self, course_name: str):
         # Parse course components
         college, dep_num, section = course_name.split()
         department, number = dep_num[:2], dep_num[2:]
 
-        # Get semester info
-        semester, year = self.get_sem_year().split()
-        year_num = int(year)
-        sem_code = {FALL_SEMESTER: 8, SPRING_SEMESTER: 1, SUMMER_SEMESTER: 5}[semester]
-        term_code = f"{year_num // 1000}{year_num % 1000}{sem_code}"
-
         # Build URL parameter string
-        params = f"&term={term_code}&subject={college}{department}&catalog_nbr={number}"
+        term_code, catalog_nbr = self.get_term_and_catalog(number)
+        params = (
+            f"&term={term_code}&subject={college}{department}&catalog_nbr={catalog_nbr}"
+        )
 
         # Set all attributes
         attrs = {
             "college": college.upper(),
             "department": department.upper(),
-            "number": number,
+            "number": catalog_nbr,
             "section": section.upper(),
-            "year": year_num,
-            "term_code": term_code,
             "bin_url": BASE_BIN_URL + params,
             "reg_url": BASE_REG_URL + params,
             "reg_option_url": BASE_REG_OPTION_URL + params,
@@ -77,9 +70,18 @@ class Course:
         for name, value in attrs.items():
             object.__setattr__(self, name, value)
 
+    def get_term_and_catalog(self, number: str) -> tuple[str, str]:
+        semester, year = self.get_sem_year().split()
+        year_num = int(year)
+        sem_code = {FALL_SEMESTER: 8, SPRING_SEMESTER: 1, SUMMER_SEMESTER: 5}[semester]
+
+        if semester == SUMMER_SEMESTER and number[-1] != "S":
+            number += "S"
+
+        return f"{year_num // 1000}{year_num % 1000}{sem_code}", number
+
     @staticmethod
-    def get_sem_year() -> str:
-        """Returns the current academic semester and year as a tuple."""
+    def get_sem_year():
         now = pendulum.now()
         month = now.month
         year = now.year

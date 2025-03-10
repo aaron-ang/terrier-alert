@@ -12,16 +12,15 @@ def test_course_init():
     course = Course(course_name)
     assert course.college == "CAS"
     assert course.department == "CS"
-    assert course.number == "111"
+    assert "111" in course.number
     assert course.section == "A1"
-    assert str(course) == course_name
 
 
 def test_course_response():
     course = Course("CAS EC101 A1")
     course_response = get_course_section(course)
     assert course_response.subject == f"{course.college}{course.department}"
-    assert course.number in course_response.catalog_nbr
+    assert course_response.catalog_nbr == course.number
     assert course_response.class_section == course.section
 
 
