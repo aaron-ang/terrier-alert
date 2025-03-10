@@ -2,9 +2,8 @@ name: Service Test
 
 on:
   push:
-    branches: ["main"]
   pull_request:
-    branches: ["main"]
+    branches: [main]
 
 permissions:
   contents: read
@@ -12,8 +11,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
-    environment: staging
 
     steps:
       - uses: actions/checkout@v4
@@ -68,3 +65,10 @@ jobs:
 
           echo "Service ran stable for 1.5 minutes"
           docker compose down
+
+      - name: Deploy
+        if: github.ref == 'refs/heads/main'
+        env:
+          deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          curl "$deploy_url"
