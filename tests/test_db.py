@@ -10,7 +10,17 @@ from pymongo.synchronous.collection import Collection
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.db import Database
-from utils.constants import *
+from utils.constants import (
+    Environment,
+    COURSE_LIST,
+    USER_LIST,
+    COURSE_NAME,
+    SEM_YEAR,
+    UID,
+    LAST_SUBSCRIBED,
+    IS_SUBSCRIBED,
+    LAST_SUBSCRIPTION,
+)
 from utils.models import Course
 
 
