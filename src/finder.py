@@ -35,18 +35,22 @@ async def register_course(env: Environment, user_cache: dict, query: CallbackQue
 async def search_courses() -> None:
     """Process all course subscriptions."""
     for course_doc in DB.get_all_courses():
-        course = Course(course_doc[COURSE_NAME])
+        course_name = course_doc[COURSE_NAME]
         users = list(course_doc[USER_LIST])
+        current_sem_year = Course.get_sem_year()
 
+        # Remove courses with no subscribers
         if not users:
-            DB.remove_course(str(course))
+            DB.remove_course(Course(course_name, purge=True))
             continue
 
-        if course_doc[SEM_YEAR] != Course.get_sem_year():
+        # Handle expired semester courses
+        if course_doc[SEM_YEAR] != current_sem_year:
+            course = Course(course_name, purge=True)
             await handle_expired_semester(course, course_doc[SEM_YEAR], users)
             continue
 
-        await process_course(course, users)
+        await process_course(Course(course_name), users)
 
 
 async def handle_expired_semester(

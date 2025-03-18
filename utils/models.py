@@ -13,6 +13,13 @@ from utils.constants import (
 )
 
 
+# Base URLs for student portal
+BASE_SEARCH_URL = (
+    "https://public.mybustudent.bu.edu/psc/BUPRD/EMPLOYEE/SA/s/WEBLIB_HCX_CM.H_CLASS_SEARCH.FieldFormula.IScript_ClassSearch?"
+    "institution=BU001"
+)
+
+
 class CourseResponse(BaseModel):
     """Model representing course information from the API response."""
 
@@ -21,21 +28,6 @@ class CourseResponse(BaseModel):
     catalog_nbr: str
     wait_tot: int
     enrollment_available: int
-
-
-# Base URLs for student portal
-BASE_BIN_URL = (
-    "https://public.mybustudent.bu.edu/psc/BUPRD/EMPLOYEE/SA/s/WEBLIB_HCX_CM.H_CLASS_SEARCH.FieldFormula.IScript_ClassSearch?"
-    "institution=BU001"
-)
-BASE_REG_URL = (
-    "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1"
-    "?ModuleName=reg%2Fadd%2Fbrowse_schedule.pl&SearchOptionDesc=Class+Number&SearchOptionCd=S"
-)
-BASE_REG_OPTION_URL = (
-    "https://www.bu.edu/link/bin/uiscgi_studentlink.pl/1"
-    "?ModuleName=reg/option/_start.pl"
-)
 
 
 @dataclass(frozen=True)
@@ -47,34 +39,38 @@ class Course:
     """
 
     course_name: InitVar[str]
+    purge: InitVar[bool] = False
     college: str = field(init=False)
     department: str = field(init=False)
     number: str = field(init=False)
     section: str = field(init=False)
-    bin_url: str = field(init=False)
-    reg_url: str = field(init=False)
-    reg_option_url: str = field(init=False)
+    search_url: str = field(init=False)
 
-    def __post_init__(self, course_name: str):
+    def __post_init__(self, course_name: str, purge: bool):
         # Parse course components
         college, dep_num, section = course_name.split()
         department, number = dep_num[:2], dep_num[2:]
 
-        # Build URL parameter string
-        term_code, catalog_nbr = self.get_term_and_catalog(number)
-        params = (
-            f"&term={term_code}&subject={college}{department}&catalog_nbr={catalog_nbr}"
-        )
-
-        # Set all attributes
         attrs = {
             "college": college.upper(),
             "department": department.upper(),
-            "number": catalog_nbr,
+            "number": number,
             "section": section.upper(),
-            "bin_url": BASE_BIN_URL + params,
-            "reg_url": BASE_REG_URL + params,
-            "reg_option_url": BASE_REG_OPTION_URL + params,
+        }
+
+        for name, value in attrs.items():
+            object.__setattr__(self, name, value)
+
+        if purge:
+            return
+
+        # Build URL parameter string and adjust course number for summer semester
+        term_code, catalog_nbr = self.get_term_and_catalog(number)
+        params = f"&term={term_code}&subject={self.college}{self.department}&catalog_nbr={catalog_nbr}"
+
+        attrs = {
+            "number": catalog_nbr,
+            "search_url": BASE_SEARCH_URL + params,
         }
 
         for name, value in attrs.items():
@@ -117,11 +113,12 @@ class Course:
         Raises:
             ValueError: If the specified section is not found
         """
-        response = requests.get(self.bin_url, impersonate="chrome")
+        response = requests.get(self.search_url, impersonate="chrome")
         response.raise_for_status()
-        classes: list = response.json()["classes"]
 
         try:
+            json_data = response.json()
+            classes: list = json_data.get("classes", [])
             course_section = next(
                 x for x in classes if x["class_section"] == self.section
             )
@@ -131,5 +128,9 @@ class Course:
                 section_name = f"{first_section['subject']} {first_section['catalog_nbr']} {first_section['class_section']}"
                 error_msg += f" Did you mean {section_name}?"
             raise ValueError(error_msg)
+        except Exception as e:
+            raise LookupError(
+                f"Error fetching course with URL {self.search_url}"
+            ) from e
 
         return CourseResponse(**course_section)
