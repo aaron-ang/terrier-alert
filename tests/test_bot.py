@@ -84,19 +84,23 @@ def mock_db():
 @pytest.mark.asyncio
 async def test_start_command(mock_update, mock_context):
     await start(mock_update, mock_context)
-    mock_update.message.reply_text.assert_called_once_with(WELCOME_TEXT, quote=True)
+    mock_update.message.reply_text.assert_called_once_with(WELCOME_TEXT, do_quote=True)
 
 
 @pytest.mark.asyncio
 async def test_help_command(mock_update, mock_context):
     await help(mock_update, mock_context)
-    mock_update.message.reply_markdown_v2.assert_called_once_with(HELP_MD, quote=True)
+    mock_update.message.reply_markdown_v2.assert_called_once_with(
+        HELP_MD, do_quote=True
+    )
 
 
 @pytest.mark.asyncio
 async def test_about_command(mock_update, mock_context):
     await about(mock_update, mock_context)
-    mock_update.message.reply_markdown_v2.assert_called_once_with(ABOUT_MD, quote=True)
+    mock_update.message.reply_markdown_v2.assert_called_once_with(
+        ABOUT_MD, do_quote=True
+    )
 
 
 @pytest.mark.asyncio
@@ -227,7 +231,9 @@ async def test_unknown_command(mock_update, mock_context):
     from src.bot import unknown
 
     await unknown(mock_update, mock_context)
-    mock_update.message.reply_text.assert_called_once_with(UNKNOWN_CMD_TEXT, quote=True)
+    mock_update.message.reply_text.assert_called_once_with(
+        UNKNOWN_CMD_TEXT, do_quote=True
+    )
 
 
 @pytest.mark.asyncio
@@ -236,7 +242,7 @@ async def test_feedback_flow(mock_update, mock_context):
     result = await await_feedback(mock_update, mock_context)
     assert result == InputStates.AWAIT_FEEDBACK
     mock_update.message.reply_text.assert_called_once_with(
-        FEEDBACK_TEXT, quote=True, reply_markup=ForceReply()
+        FEEDBACK_TEXT, do_quote=True, reply_markup=ForceReply()
     )
 
     mock_update.message.reply_text.reset_mock()

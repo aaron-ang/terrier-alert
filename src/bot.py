@@ -105,7 +105,7 @@ async def clear_invalid_msg(user_cache: UserCache, context: ContextTypes.DEFAULT
 
 async def start(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/start` command"""
-    await update.message.reply_text(conv.WELCOME_TEXT, quote=True)
+    await update.message.reply_text(conv.WELCOME_TEXT, do_quote=True)
 
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -117,7 +117,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_subscribed:
         course = conv.get_course(user_cache)
         await update.message.reply_markdown_v2(
-            conv.already_subscribed_md(course), quote=True
+            conv.already_subscribed_md(course), do_quote=True
         )
         return ConversationHandler.END
 
@@ -128,14 +128,14 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "America/New_York"
             ).strftime("%b %d %I:%M%p %Z")
             await update.message.reply_markdown_v2(
-                conv.recently_subscribed_md(next_subscribed_local), quote=True
+                conv.recently_subscribed_md(next_subscribed_local), do_quote=True
             )
             return ConversationHandler.END
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
     conv_message = await update.message.reply_markdown_v2(
-        text=conv.get_subscription_md(user_cache), quote=True, reply_markup=keyboard
+        text=conv.get_subscription_md(user_cache), do_quote=True, reply_markup=keyboard
     )
     user_cache[MsgEnum.SUBSCRIPTION_MSG_ID] = conv_message.message_id
 
@@ -251,11 +251,11 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     is_subscribed, last_subscribed = get_subscription_status(user_cache, context)
 
     if last_subscribed is None:
-        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
+        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, do_quote=True)
         return ConversationHandler.END
 
     if is_subscribed:
-        await update.message.reply_text(conv.NOT_AVAILABLE_TEXT, quote=True)
+        await update.message.reply_text(conv.NOT_AVAILABLE_TEXT, do_quote=True)
         return ConversationHandler.END
 
     last_subscribed_course = user_cache.get(MsgEnum.LAST_SUBSCRIPTION, "")
@@ -263,7 +263,7 @@ async def register(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reg_prompt = f"Register for {last_subscribed_course}?"
     await update.message.reply_text(
         text=reg_prompt,
-        quote=True,
+        do_quote=True,
         reply_markup=InlineKeyboardMarkup(conv.get_confirmation_buttons()),
     )
     return InputStates.AWAIT_SELECTION
@@ -377,19 +377,19 @@ async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if is_subscribed:
         course = conv.get_course(user_cache)
         await update.message.reply_markdown_v2(
-            conv.already_subscribed_md(course), quote=True
+            conv.already_subscribed_md(course), do_quote=True
         )
         return ConversationHandler.END
 
     last_subscribed_course = user_cache.get(MsgEnum.LAST_SUBSCRIPTION, "")
     if last_subscribed_course == "":
-        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
+        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, do_quote=True)
         return ConversationHandler.END
 
     text = f"Confirm resubscription to {last_subscribed_course}?"
     await update.message.reply_text(
         text=text,
-        quote=True,
+        do_quote=True,
         reply_markup=InlineKeyboardMarkup(conv.get_confirmation_buttons()),
     )
     return InputStates.AWAIT_SELECTION
@@ -424,11 +424,11 @@ async def unsubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
         buttons = conv.get_confirmation_buttons()
         keyboard = InlineKeyboardMarkup(buttons)
         await update.message.reply_text(
-            conv.UNSUBSCRIBE_TEXT, quote=True, reply_markup=keyboard
+            conv.UNSUBSCRIBE_TEXT, do_quote=True, reply_markup=keyboard
         )
         return InputStates.AWAIT_SELECTION
     else:
-        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, quote=True)
+        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, do_quote=True)
         return ConversationHandler.END
 
 
@@ -455,7 +455,7 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def await_feedback(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Ask user for feedback"""
     await update.message.reply_text(
-        conv.FEEDBACK_TEXT, quote=True, reply_markup=ForceReply()
+        conv.FEEDBACK_TEXT, do_quote=True, reply_markup=ForceReply()
     )
     return InputStates.AWAIT_FEEDBACK
 
@@ -475,7 +475,7 @@ async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def help(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/help` command"""
-    await update.message.reply_markdown_v2(conv.HELP_MD, quote=True)
+    await update.message.reply_markdown_v2(conv.HELP_MD, do_quote=True)
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -495,17 +495,19 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def about(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/about` command"""
-    await update.message.reply_markdown_v2(conv.ABOUT_MD, quote=True)
+    await update.message.reply_markdown_v2(conv.ABOUT_MD, do_quote=True)
 
 
 async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle unknown commands"""
-    await update.message.reply_text(conv.UNKNOWN_CMD_TEXT, quote=True)
+    await update.message.reply_text(conv.UNKNOWN_CMD_TEXT, do_quote=True)
 
 
 async def error_handler(_update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send an error notification to Telegram feedback channel."""
-    tb_list = traceback.format_tb(context.error.__traceback__)
+    tb_list = traceback.format_exception(
+        None, context.error, context.error.__traceback__
+    )
     tb_string = "".join(tb_list)
     print(tb_string)
     message = "An exception was raised while handling an update\n<pre>{tb}</pre>"
