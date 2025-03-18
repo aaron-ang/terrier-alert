@@ -50,7 +50,7 @@ jobs:
 
       - name: Build and Test Service
         run: |
-          docker compose up -d
+          docker compose up --build -d
 
           START_TIME=$(date +%s)
           END_TIME=$((START_TIME + 90))
