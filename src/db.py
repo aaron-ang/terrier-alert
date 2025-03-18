@@ -11,7 +11,17 @@ import certifi
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.models import Course
-from utils.constants import *
+from utils.constants import (
+    Environment,
+    COURSE_LIST,
+    USER_LIST,
+    COURSE_NAME,
+    SEM_YEAR,
+    UID,
+    LAST_SUBSCRIBED,
+    IS_SUBSCRIBED,
+    LAST_SUBSCRIPTION,
+)
 
 load_dotenv()
 
@@ -31,9 +41,10 @@ class Database:
         return self.course_collection.find_one({USER_LIST: uid})
 
     def subscribe(
-        self, course_name: str, uid: str, subscription_time: pendulum.DateTime
+        self, course: Course, uid: str, subscription_time: pendulum.DateTime
     ) -> None:
         """Update course with new user, inserting new course if necessary"""
+        course_name = str(course)
         sem_year = Course.get_sem_year()
         self.course_collection.update_one(
             {COURSE_NAME: course_name, SEM_YEAR: sem_year},
@@ -43,16 +54,17 @@ class Database:
         self.update_subscription_time(uid, subscription_time)
         self.update_subscription_status(uid, course_name, True)
 
-    def unsubscribe(self, course_name: str, uid: str) -> None:
+    def unsubscribe(self, course: Course, uid: str) -> None:
         """Remove user from course"""
+        course_name = str(course)
         self.course_collection.update_one(
             {COURSE_NAME: course_name}, {"$pull": {USER_LIST: uid}}
         )
         self.update_subscription_status(uid, course_name, False)
 
-    def remove_course(self, course_name: str) -> None:
+    def remove_course(self, course: Course) -> None:
         """Remove course from database"""
-        return self.course_collection.delete_one({COURSE_NAME: course_name})
+        return self.course_collection.delete_one({COURSE_NAME: str(course)})
 
     def get_all_users(self) -> Iterator[dict]:
         """Find all users in database and return iterable of collection objects"""
