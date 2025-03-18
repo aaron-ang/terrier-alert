@@ -215,6 +215,12 @@ async def test_unsubscribe_dialog_subscribed(mock_update, mock_context, mock_db)
         InlineKeyboardMarkup,
     )
 
+    # Check that there's at least one button in the markup
+    keyboard = mock_update.message.reply_text.call_args[1][
+        "reply_markup"
+    ].inline_keyboard
+    assert len(keyboard) > 0
+
 
 @pytest.mark.asyncio
 async def test_unknown_command(mock_update, mock_context):
