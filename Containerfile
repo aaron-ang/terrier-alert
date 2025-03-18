@@ -15,5 +15,6 @@ RUN ["chmod", "+x", "./src/main.sh"]
 
 CMD ["./src/main.sh", "--dev"]
 
-# podman compose up
+# podman compose up --build
+# podman compose down
 # podman system prune

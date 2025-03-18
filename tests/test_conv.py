@@ -4,8 +4,17 @@ import pytest
 from telegram import InlineKeyboardButton
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.conv import *
 from utils.constants import Message, InputStates
+from utils.conv import (
+    COLLEGES,
+    get_main_buttons,
+    get_college_buttons,
+    get_confirmation_buttons,
+    get_course,
+    get_subscription_md,
+    fields_equal,
+)
+from utils.models import Course
 
 
 def test_get_main_buttons_empty_cache():
@@ -52,20 +61,20 @@ def test_get_confirmation_buttons():
     assert buttons[0][1].text == "No"
 
 
-def test_get_course_name():
+def test_get_course():
     cache = {
         Message.COLLEGE: "CAS",
         Message.DEPARTMENT: "CS",
         Message.COURSE_NUM: "111",
         Message.SECTION: "A1",
     }
-    course_name = get_course_name(cache)
-    assert course_name == "CAS CS111 A1"
+    course = get_course(cache)
+    assert course == Course("CAS CS111 A1")
 
 
 def test_get_course_name_missing_fields():
     with pytest.raises(AssertionError):
-        get_course_name({Message.COLLEGE: "CAS"})
+        get_course({Message.COLLEGE: "CAS"})
 
 
 def test_get_subscription_md():

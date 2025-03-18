@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
-from utils.constants import *
+from utils.constants import InputStates, Message, FORM_FIELDS, CRED_FIELDS
 from utils.models import Course
 
 load_dotenv()
@@ -23,12 +23,10 @@ NOT_AVAILABLE_TEXT = (
     "You will be notified when it becomes available."
 )
 ALREADY_SUBSCRIBED_MD = (
-    "*You are already subscribed to @*\!\n\n"
-    f"Use /unsubscribe to end your subscription\."
+    "*You are already subscribed to @*\!\n\nUse /unsubscribe to end your subscription\."
 )
 RECENTLY_SUBSCRIBED_MD = (
-    "*You have recently subscribed to a course*\.\n\n"
-    f"Please wait until @ to subscribe\."
+    "*You have recently subscribed to a course*\.\n\nPlease wait until @ to subscribe\."
 )
 UNSUBSCRIBE_TEXT = (
     "You can only resubscribe 24 hours after your last subscription. "
@@ -148,12 +146,13 @@ def get_confirmation_buttons():
     ]
 
 
-def get_course_name(user_cache: dict[str, str]):
-    """Format course name to match input for Course class"""
-    assert all(
-        field in user_cache for field in FORM_FIELDS
-    ), "User cache does not contain all form fields"
-    return f"{user_cache[Message.COLLEGE]} {user_cache[Message.DEPARTMENT]}{user_cache[Message.COURSE_NUM]} {user_cache[Message.SECTION]}"
+def get_course(user_cache: dict[str, str]):
+    """Convert user cache to Course object"""
+    assert all(field in user_cache for field in FORM_FIELDS), (
+        "User cache does not contain all form fields"
+    )
+    course_str = f"{user_cache[Message.COLLEGE]} {user_cache[Message.DEPARTMENT]}{user_cache[Message.COURSE_NUM]} {user_cache[Message.SECTION]}"
+    return Course(course_str)
 
 
 def get_subscription_md(user_cache: dict):
@@ -186,8 +185,8 @@ def recently_subscribed_md(time: str):
     return RECENTLY_SUBSCRIBED_MD.replace("@", time)
 
 
-def already_subscribed_md(course_name: str):
-    return ALREADY_SUBSCRIBED_MD.replace("@", course_name)
+def already_subscribed_md(course: Course):
+    return ALREADY_SUBSCRIBED_MD.replace("@", str(course))
 
 
 def fields_equal(cache1: dict, cache2: dict, fields: set):

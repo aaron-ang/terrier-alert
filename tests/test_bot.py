@@ -20,8 +20,24 @@ from src.bot import (
     error_handler,
 )
 from src.db import Database
-from utils import conv
-from utils.constants import *
+from utils.conv import (
+    WELCOME_TEXT,
+    HELP_MD,
+    ABOUT_MD,
+    FEEDBACK_TEXT,
+    FEEDBACK_SUCCESS_TEXT,
+    UNKNOWN_CMD_TEXT,
+)
+from utils.constants import (
+    Environment,
+    InputStates,
+    Message as MsgEnum,
+    IS_SUBSCRIBED,
+    LAST_SUBSCRIBED,
+    LAST_SUBSCRIPTION,
+    COURSE_NAME,
+    USER_LIST,
+)
 
 
 @pytest.fixture
@@ -68,25 +84,19 @@ def mock_db():
 @pytest.mark.asyncio
 async def test_start_command(mock_update, mock_context):
     await start(mock_update, mock_context)
-    mock_update.message.reply_text.assert_called_once_with(
-        conv.WELCOME_TEXT, quote=True
-    )
+    mock_update.message.reply_text.assert_called_once_with(WELCOME_TEXT, quote=True)
 
 
 @pytest.mark.asyncio
 async def test_help_command(mock_update, mock_context):
     await help(mock_update, mock_context)
-    mock_update.message.reply_markdown_v2.assert_called_once_with(
-        conv.HELP_MD, quote=True
-    )
+    mock_update.message.reply_markdown_v2.assert_called_once_with(HELP_MD, quote=True)
 
 
 @pytest.mark.asyncio
 async def test_about_command(mock_update, mock_context):
     await about(mock_update, mock_context)
-    mock_update.message.reply_markdown_v2.assert_called_once_with(
-        conv.ABOUT_MD, quote=True
-    )
+    mock_update.message.reply_markdown_v2.assert_called_once_with(ABOUT_MD, quote=True)
 
 
 @pytest.mark.asyncio
@@ -109,11 +119,11 @@ async def test_subscribe_new_user(mock_update, mock_context):
 @pytest.mark.asyncio
 async def test_subscribe_already_subscribed(mock_update, mock_context, mock_db):
     mock_context.user_data = {
-        Message.IS_SUBSCRIBED: True,
-        Message.COLLEGE: "CAS",
-        Message.DEPARTMENT: "CS",
-        Message.COURSE_NUM: "111",
-        Message.SECTION: "A1",
+        MsgEnum.IS_SUBSCRIBED: True,
+        MsgEnum.COLLEGE: "CAS",
+        MsgEnum.DEPARTMENT: "CS",
+        MsgEnum.COURSE_NUM: "111",
+        MsgEnum.SECTION: "A1",
     }
     mock_db.get_user.return_value = {
         IS_SUBSCRIBED: True,
@@ -151,9 +161,9 @@ async def test_subscribe_recently_subscribed(mock_update, mock_context, mock_db)
 async def test_cancel_command(mock_update, mock_context):
     # Setup some user data to be cleared
     mock_context.user_data = {
-        Message.USERNAME: "test",
-        Message.PASSWORD: "secret",
-        Message.INVALID_MSG_ID: 123,
+        MsgEnum.USERNAME: "test",
+        MsgEnum.PASSWORD: "secret",
+        MsgEnum.INVALID_MSG_ID: 123,
     }
 
     # Since we're not using callback_query, bot.send_message should be called
@@ -163,8 +173,8 @@ async def test_cancel_command(mock_update, mock_context):
 
     # Verify results
     assert result == ConversationHandler.END
-    assert Message.USERNAME not in mock_context.user_data
-    assert Message.PASSWORD not in mock_context.user_data
+    assert MsgEnum.USERNAME not in mock_context.user_data
+    assert MsgEnum.PASSWORD not in mock_context.user_data
     mock_context.bot.send_message.assert_called_once_with(
         mock_context._chat_id, "Aborted."
     )
@@ -205,15 +215,19 @@ async def test_unsubscribe_dialog_subscribed(mock_update, mock_context, mock_db)
         InlineKeyboardMarkup,
     )
 
+    # Check that there's at least one button in the markup
+    keyboard = mock_update.message.reply_text.call_args[1][
+        "reply_markup"
+    ].inline_keyboard
+    assert len(keyboard) > 0
+
 
 @pytest.mark.asyncio
 async def test_unknown_command(mock_update, mock_context):
     from src.bot import unknown
 
     await unknown(mock_update, mock_context)
-    mock_update.message.reply_text.assert_called_once_with(
-        conv.UNKNOWN_CMD_TEXT, quote=True
-    )
+    mock_update.message.reply_text.assert_called_once_with(UNKNOWN_CMD_TEXT, quote=True)
 
 
 @pytest.mark.asyncio
@@ -222,7 +236,7 @@ async def test_feedback_flow(mock_update, mock_context):
     result = await await_feedback(mock_update, mock_context)
     assert result == InputStates.AWAIT_FEEDBACK
     mock_update.message.reply_text.assert_called_once_with(
-        conv.FEEDBACK_TEXT, quote=True, reply_markup=ForceReply()
+        FEEDBACK_TEXT, quote=True, reply_markup=ForceReply()
     )
 
     mock_update.message.reply_text.reset_mock()
@@ -234,4 +248,4 @@ async def test_feedback_flow(mock_update, mock_context):
 
     assert result == ConversationHandler.END
     mock_context.bot.send_message.assert_called_once()
-    mock_update.message.reply_text.assert_called_once_with(conv.FEEDBACK_SUCCESS_TEXT)
+    mock_update.message.reply_text.assert_called_once_with(FEEDBACK_SUCCESS_TEXT)

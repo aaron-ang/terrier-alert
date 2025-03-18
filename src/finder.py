@@ -10,8 +10,8 @@ from telegram.ext import ContextTypes
 # Local imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.db import Database
-from utils.constants import *
-from utils.models import Course, get_course_section
+from utils.constants import Environment, TimeConstants, SEM_YEAR, USER_LIST, COURSE_NAME
+from utils.models import Course
 
 # Constants
 load_dotenv()
@@ -35,18 +35,22 @@ async def register_course(env: Environment, user_cache: dict, query: CallbackQue
 async def search_courses() -> None:
     """Process all course subscriptions."""
     for course_doc in DB.get_all_courses():
-        course = Course(course_doc[COURSE_NAME])
+        course_name = course_doc[COURSE_NAME]
         users = list(course_doc[USER_LIST])
+        current_sem_year = Course.get_sem_year()
 
+        # Remove courses with no subscribers
         if not users:
-            DB.remove_course(str(course))
+            DB.remove_course(Course(course_name, purge=True))
             continue
 
-        if course_doc[SEM_YEAR] != Course.get_sem_year():
+        # Handle expired semester courses
+        if course_doc[SEM_YEAR] != current_sem_year:
+            course = Course(course_name, purge=True)
             await handle_expired_semester(course, course_doc[SEM_YEAR], users)
             continue
 
-        await process_course(course, users)
+        await process_course(Course(course_name), users)
 
 
 async def handle_expired_semester(
@@ -63,7 +67,7 @@ async def handle_expired_semester(
 async def process_course(course: Course, users: list[str]):
     """Checks for edge cases and course availability. Handles notifications for each case."""
     try:
-        course_response = get_course_section(course)
+        course_response = course.get_course_section()
     except ValueError as exc:
         await notify_users_and_unsubscribe(course, str(exc), users)
         return
@@ -84,11 +88,11 @@ async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str
             text=msg,
             write_timeout=TimeConstants.TIMEOUT_SECONDS,
         )
-        DB.unsubscribe(str(course), uid)
+        DB.unsubscribe(course, uid)
 
 
 def init(context: ContextTypes.DEFAULT_TYPE):
-    global BOT, DB, DRIVER, WAIT
+    global BOT, DB
     BOT = context.bot
     DB = context.job.data["db"]
 
