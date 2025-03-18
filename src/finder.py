@@ -10,8 +10,8 @@ from telegram.ext import ContextTypes
 # Local imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.db import Database
-from utils.constants import *
-from utils.models import Course, get_course_section
+from utils.constants import Environment, TimeConstants, SEM_YEAR, USER_LIST, COURSE_NAME
+from utils.models import Course
 
 # Constants
 load_dotenv()
@@ -63,7 +63,7 @@ async def handle_expired_semester(
 async def process_course(course: Course, users: list[str]):
     """Checks for edge cases and course availability. Handles notifications for each case."""
     try:
-        course_response = get_course_section(course)
+        course_response = course.get_course_section()
     except ValueError as exc:
         await notify_users_and_unsubscribe(course, str(exc), users)
         return
@@ -84,11 +84,11 @@ async def notify_users_and_unsubscribe(course: Course, msg: str, users: list[str
             text=msg,
             write_timeout=TimeConstants.TIMEOUT_SECONDS,
         )
-        DB.unsubscribe(str(course), uid)
+        DB.unsubscribe(course, uid)
 
 
 def init(context: ContextTypes.DEFAULT_TYPE):
-    global BOT, DB, DRIVER, WAIT
+    global BOT, DB
     BOT = context.bot
     DB = context.job.data["db"]
 

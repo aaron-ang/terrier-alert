@@ -13,6 +13,16 @@ from utils.constants import (
 )
 
 
+class CourseResponse(BaseModel):
+    """Model representing course information from the API response."""
+
+    class_section: str
+    subject: str
+    catalog_nbr: str
+    wait_tot: int
+    enrollment_available: int
+
+
 # Base URLs for student portal
 BASE_BIN_URL = (
     "https://public.mybustudent.bu.edu/psc/BUPRD/EMPLOYEE/SA/s/WEBLIB_HCX_CM.H_CLASS_SEARCH.FieldFormula.IScript_ClassSearch?"
@@ -70,6 +80,9 @@ class Course:
         for name, value in attrs.items():
             object.__setattr__(self, name, value)
 
+    def __repr__(self) -> str:
+        return f"{self.college} {self.department}{self.number} {self.section}"
+
     def get_term_and_catalog(self, number: str) -> tuple[str, str]:
         semester, year = self.get_sem_year().split()
         year_num = int(year)
@@ -98,45 +111,25 @@ class Course:
 
         return f"{semester} {year}"
 
-    def __repr__(self) -> str:
-        return f"{self.college} {self.department}{self.number} {self.section}"
+    def get_course_section(self) -> CourseResponse:
+        """Fetches course section information from BU's API.
 
+        Raises:
+            ValueError: If the specified section is not found
+        """
+        response = requests.get(self.bin_url, impersonate="chrome")
+        response.raise_for_status()
+        classes: list = response.json()["classes"]
 
-class CourseResponse(BaseModel):
-    """Model representing course information from the API response."""
+        try:
+            course_section = next(
+                x for x in classes if x["class_section"] == self.section
+            )
+        except StopIteration:
+            error_msg = f"{self} was not found."
+            if classes and (first_section := classes[0]):
+                section_name = f"{first_section['subject']} {first_section['catalog_nbr']} {first_section['class_section']}"
+                error_msg += f" Did you mean {section_name}?"
+            raise ValueError(error_msg)
 
-    class_section: str
-    subject: str
-    catalog_nbr: str
-    wait_tot: int
-    enrollment_available: int
-
-
-def get_course_section(course: Course) -> CourseResponse:
-    """Fetches course section information from BU's API.
-
-    Args:
-        course: The Course object to query
-
-    Returns:
-        CourseResponse with section information
-
-    Raises:
-        ValueError: If the specified section is not found
-    """
-    response = requests.get(course.bin_url, impersonate="chrome")
-    response.raise_for_status()
-    classes: list = response.json()["classes"]
-
-    try:
-        course_section = next(
-            x for x in classes if x["class_section"] == course.section
-        )
-    except StopIteration:
-        error_msg = f"{course} was not found."
-        if classes and (first_section := classes[0]):
-            section_name = f"{first_section['subject']} {first_section['catalog_nbr']} {first_section['class_section']}"
-            error_msg += f" Did you mean {section_name}?"
-        raise ValueError(error_msg)
-
-    return CourseResponse(**course_section)
+        return CourseResponse(**course_section)

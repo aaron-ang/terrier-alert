@@ -4,7 +4,7 @@ import sys
 import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.models import Course, get_course_section
+from utils.models import Course
 
 
 def test_course_init():
@@ -18,7 +18,7 @@ def test_course_init():
 
 def test_course_response():
     course = Course("CAS EC101 A1")
-    course_response = get_course_section(course)
+    course_response = course.get_course_section()
     assert course_response.subject == f"{course.college}{course.department}"
     assert course_response.catalog_nbr == course.number
     assert course_response.class_section == course.section
@@ -27,11 +27,11 @@ def test_course_response():
 def test_missing_course():
     with pytest.raises(Exception):
         course = Course("CAS CS999 A1")
-        get_course_section(course)
+        course.get_course_section()
 
     with pytest.raises(Exception) as e_info:
         course = Course("CAS CS111 Z1")
-        get_course_section(course)
+        course.get_course_section()
 
     assert e_info.type is ValueError
     assert f"{course} was not found. Did you mean CASCS 111" in e_info.value.args[0]
