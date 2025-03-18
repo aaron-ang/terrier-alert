@@ -505,18 +505,14 @@ async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 async def error_handler(_update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send an error notification to Telegram feedback channel."""
-    tb_list = traceback.format_exception(
-        None, context.error, context.error.__traceback__
-    )
+    tb_list = traceback.format_tb(context.error.__traceback__)
     tb_string = "".join(tb_list)
     print(tb_string)
     message = "An exception was raised while handling an update\n<pre>{tb}</pre>"
     message_len_limit = 4096
     await context.bot.send_message(
         chat_id=FEEDBACK_CHANNEL_ID,
-        text=message.format(
-            tb=html.escape(tb_string[: message_len_limit - len(message)])
-        ),
+        text=message.format(tb=html.escape(tb_string[:message_len_limit])),
         parse_mode=constants.ParseMode.HTML,
     )
 

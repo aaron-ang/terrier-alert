@@ -147,7 +147,7 @@ def get_confirmation_buttons():
 
 
 def get_course(user_cache: dict[str, str]):
-    """Format course name to match input for Course class"""
+    """Convert user cache to Course object"""
     assert all(field in user_cache for field in FORM_FIELDS), (
         "User cache does not contain all form fields"
     )
