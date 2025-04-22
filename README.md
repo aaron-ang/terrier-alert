@@ -8,13 +8,13 @@ Deployed on [Render](https://render.com/).
 
 ![demo](doc/terrier-alert-demo.gif)
 
-### Register Feature
+### Register Feature (Deprecated)
 
 ![register](doc/terrier-alert-register.gif)
 
 ## System Design Overview
 
-![system schema](doc/terrier-alert-overview.drawio.png)
+![system schema](doc/terrier-alert-design-latest.png)
 
 ## Technical Details
 
