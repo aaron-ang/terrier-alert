@@ -4,6 +4,6 @@ fastapi[standard]==0.115.11
 pendulum==3.0.0
 pydantic==2.10.6
 pymongo==4.11.3
-pytest==8.3.5
+pytest==9.0.3
 python-dotenv==1.2.2
 python-telegram-bot[ext]==22.0
