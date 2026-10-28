@@ -88,25 +88,8 @@ jobs:
         if: always()
         run: docker compose down
 
-  # Single required status check for branch protection on main
-  build:
-    needs: [lint, test, smoke]
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 1
-    steps:
-      - name: Require lint, test and smoke to pass
-        env:
-          LINT: ${{ needs.lint.result }}
-          TEST: ${{ needs.test.result }}
-          SMOKE: ${{ needs.smoke.result }}
-        run: |
-          echo "lint=$LINT test=$TEST smoke=$SMOKE"
-          [ "$LINT" = success ] && [ "$TEST" = success ] \
-            && { [ "$SMOKE" = success ] || [ "$SMOKE" = skipped ]; }
-
   deploy:
-    needs: build
+    needs: [lint, test, smoke]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
