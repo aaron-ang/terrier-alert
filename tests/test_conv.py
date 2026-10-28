@@ -1,18 +1,16 @@
-import os
-import sys
 import pytest
 from telegram import InlineKeyboardButton
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.constants import Message, InputStates
+from utils.constants import InputStates, Message
 from utils.conv import (
     COLLEGES,
-    get_main_buttons,
+    fields_equal,
     get_college_buttons,
     get_confirmation_buttons,
     get_course,
+    get_main_buttons,
     get_subscription_md,
-    fields_equal,
+    parse_field,
 )
 from utils.models import Course
 
@@ -69,7 +67,7 @@ def test_get_course():
         Message.SECTION: "A1",
     }
     course = get_course(cache)
-    assert course == Course("CAS CS111 A1")
+    assert course == Course.parse("CAS CS111 A1")
 
 
 def test_get_course_name_missing_fields():
@@ -102,3 +100,19 @@ def test_fields_equal():
 
     assert fields_equal(cache1, cache2, {Message.COLLEGE, Message.DEPARTMENT})
     assert not fields_equal(cache1, cache3, {Message.COLLEGE, Message.DEPARTMENT})
+
+
+@pytest.mark.parametrize(
+    "field, text, expected",
+    [
+        (Message.DEPARTMENT, "cs", "CS"),
+        (Message.DEPARTMENT, "C1", None),
+        (Message.COURSE_NUM, "111", "111"),
+        (Message.COURSE_NUM, "011", None),
+        (Message.SECTION, "a1", "A1"),
+        (Message.SECTION, "AA", "AA"),
+        (Message.SECTION, "1A", None),
+    ],
+)
+def test_parse_field(field, text, expected):
+    assert parse_field(field, text) == expected

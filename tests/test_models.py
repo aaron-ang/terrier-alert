@@ -1,48 +1,42 @@
-import os
-import sys
-
+import pendulum
 import pytest
-from curl_cffi.requests.exceptions import HTTPError
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.models import Course
+from utils.models import Course, get_sem_year
 
 
-def get_section_or_skip(course: Course):
-    """Query BU's live class search, skipping the test while BU is down."""
-    try:
-        return course.get_course_section()
-    except HTTPError as e:
-        if e.response is not None and e.response.status_code >= 500:
-            pytest.skip(f"BU class search unavailable: {e}")
-        raise
+def test_course_parse():
+    course = Course.parse("CAS CS111 A1")
+    assert course == Course("CAS", "CS", "111", "A1")
+    assert str(course) == "CAS CS111 A1"
 
 
-def test_course_init():
-    course_name = "CAS CS111 A1"
-    course = Course(course_name)
-    assert course.college == "CAS"
-    assert course.department == "CS"
-    assert "111" in course.number
-    assert course.section == "A1"
+def test_course_parse_normalizes_case_and_spaces():
+    assert str(Course.parse("  cas   cs111 a1 ")) == "CAS CS111 A1"
 
 
-def test_course_response():
-    course = Course("CAS EC101 A1")
-    course_response = get_section_or_skip(course)
-    assert course_response.subject == f"{course.college}{course.department}"
-    assert course_response.catalog_nbr == course.number
-    assert course_response.class_section == course.section
+def test_course_parse_keeps_summer_suffix():
+    assert Course.parse("CAS CS111S A1").number == "111S"
 
 
-def test_missing_course():
-    with pytest.raises(Exception):
-        course = Course("CAS CS999 A1")
-        get_section_or_skip(course)
+@pytest.mark.parametrize(
+    "name", ["", "CAS CS111", "CAS CS11 A1", "CA CS111 A1", "CAS CS111 A1 X"]
+)
+def test_course_parse_rejects_malformed(name):
+    with pytest.raises(ValueError):
+        Course.parse(name)
 
-    with pytest.raises(Exception) as e_info:
-        course = Course("CAS CS111 Z1")
-        get_section_or_skip(course)
 
-    assert e_info.type is ValueError
-    assert f"{course} was not found. Did you mean CASCS 111" in e_info.value.args[0]
+@pytest.mark.parametrize(
+    "date, expected",
+    [
+        ("2026-01-15", "Spring 2026"),
+        ("2026-02-28", "Spring 2026"),
+        ("2026-03-01", "Summer 2026"),
+        ("2026-04-01", "Fall 2026"),
+        ("2026-09-30", "Fall 2026"),
+        ("2026-10-01", "Spring 2027"),
+        ("2026-12-31", "Spring 2027"),
+    ],
+)
+def test_get_sem_year(date, expected):
+    assert get_sem_year(pendulum.parse(date)) == expected

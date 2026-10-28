@@ -1,12 +1,11 @@
-import sys
+from dotenv import load_dotenv
 
-sys.path.append("./")
 from src.db import Database
-from src.bot import Environment
-from utils.constants import UID, USER_LIST, COURSE_NAME, LAST_SUBSCRIPTION
+from utils.constants import COURSE_NAME, LAST_SUBSCRIPTION, UID, USER_LIST, Environment
 
 
 def update(env: Environment):
+    load_dotenv()
     database = Database(env)
 
     for course in database.get_all_courses():
