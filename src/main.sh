@@ -7,6 +7,8 @@ cleanup() {
     echo "Shutting down..."
     # Kill all background processes in the current process group
     kill $(jobs -p) 2>/dev/null
+    # Let the bot stop polling cleanly so a new instance can take over
+    wait
     exit "${1:-0}"
 }
 

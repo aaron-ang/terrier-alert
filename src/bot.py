@@ -15,7 +15,7 @@ from telegram import (
     Update,
     constants,
 )
-from telegram.error import TelegramError
+from telegram.error import Conflict, TelegramError
 from telegram.ext import (
     ApplicationBuilder,
     CallbackQueryHandler,
@@ -385,6 +385,11 @@ async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 async def error_handler(_update: object, context: ContextTypes.DEFAULT_TYPE):
     """Send an error notification to Telegram feedback channel."""
+    if isinstance(context.error, Conflict):
+        # Render runs the old and new instance side by side during a deploy.
+        # Polling retries and takes over once the old instance stops.
+        logger.warning("Another instance is polling: %s", context.error)
+        return
     logger.error("Unhandled exception", exc_info=context.error)
     tb_string = "".join(
         traceback.format_exception(None, context.error, context.error.__traceback__)

@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pendulum
 import pytest
 from telegram import Chat, ForceReply, InlineKeyboardMarkup, Message, Update, User
+from telegram.error import Conflict
 from telegram.ext import ContextTypes, ConversationHandler
 
 from src.bot import (
@@ -297,3 +298,10 @@ async def test_error_handler_truncates_long_traceback(mock_update, mock_context)
     text = mock_context.bot.send_message.call_args.kwargs["text"]
     assert len(text) <= 4096
     assert text.endswith("</pre>")
+
+
+@pytest.mark.asyncio
+async def test_error_handler_ignores_polling_conflict(mock_update, mock_context):
+    mock_context.error = Conflict("terminated by other getUpdates request")
+    await error_handler(mock_update, mock_context)
+    mock_context.bot.send_message.assert_not_called()
