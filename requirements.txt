@@ -1,4 +1,4 @@
-certifi==2025.1.31
+certifi==2026.10.18
 curl_cffi==0.10.0
 fastapi[standard]==0.115.11
 pendulum==3.0.0
