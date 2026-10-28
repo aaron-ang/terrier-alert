@@ -1,47 +1,36 @@
 """This module contains all the text and buttons used in the bot."""
 
 import os
+import re
 
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
-from utils.constants import InputStates, Message, FORM_FIELDS, CRED_FIELDS
-from utils.models import Course
+from utils.constants import FORM_FIELDS, InputStates, Message
+from utils.models import Course, get_sem_year
 
 load_dotenv()
 
 REPO_URL = os.getenv("REPO_URL")
-WELCOME_TEXT = (
-    f"Welcome to Terrier Alert {Course.get_sem_year()}!\n"
-    "Use the Menu button to get started."
-)
 NOT_SUBSCRIBED_TEXT = (
     "You are not subscribed to any course. Use /subscribe to start a subscription."
 )
-NOT_AVAILABLE_TEXT = (
-    "The course you are subscribed to is not available yet. "
-    "You will be notified when it becomes available."
-)
-ALREADY_SUBSCRIBED_MD = (
-    "*You are already subscribed to @*\!\n\nUse /unsubscribe to end your subscription\."
-)
-RECENTLY_SUBSCRIBED_MD = (
-    "*You have recently subscribed to a course*\.\n\nPlease wait until @ to subscribe\."
-)
+ALREADY_SUBSCRIBED_MD = "*You are already subscribed to @*\\!\n\nUse /unsubscribe to end your subscription\\."
+RECENTLY_SUBSCRIBED_MD = "*You have recently subscribed to a course*\\.\n\nPlease wait until @ to subscribe\\."
 UNSUBSCRIBE_TEXT = (
     "You can only resubscribe 24 hours after your last subscription. "
     "Are you sure you want to unsubscribe?"
 )
 HELP_MD = (
-    "• Use the bot commands to interact with the app\.\n"
-    "• Each user is limited to *ONE* subscription at any time\.\n"
-    "• Each user is allowed to change their subscription once every 24 hours\.\n"
-    "• Once your class is available, you will be notified and your subscription will be cleared\."
+    "• Use the bot commands to interact with the app\\.\n"
+    "• Each user is limited to *ONE* subscription at any time\\.\n"
+    "• Each user is allowed to change their subscription once every 24 hours\\.\n"
+    "• Once your class is available, you will be notified and your subscription will be cleared\\."
 )
 ABOUT_MD = (
     "Terrier Alert is built with "
-    "*python\-telegram\-bot*, *PyMongo*, and is hosted on *Render*\. "
-    f"Check out the code [here]({REPO_URL})\."
+    "*python\\-telegram\\-bot*, *PyMongo*, and is hosted on *Render*\\. "
+    f"Check out the code [here]({REPO_URL})\\."
 )
 UNKNOWN_CMD_TEXT = (
     "Sorry, I didn't understand that command. If you are currently in a subscription conversation, "
@@ -50,7 +39,30 @@ UNKNOWN_CMD_TEXT = (
 FEEDBACK_TEXT = "Enter and submit your feedback here. Use /cancel to abort."
 FEEDBACK_SUCCESS_TEXT = "Feedback received. Thank you!"
 FEEDBACK_FAILURE_TEXT = "Feedback failed to send. Please try again later."
+FIELD_PATTERNS = {
+    Message.DEPARTMENT: re.compile(r"[A-Z]{2}"),
+    Message.COURSE_NUM: re.compile(r"[1-9][0-9]{2}"),
+    Message.SECTION: re.compile(r"[A-Z][A-Z0-9]"),
+}
+FIELD_LABELS = {
+    Message.DEPARTMENT: "department",
+    Message.COURSE_NUM: "course number",
+    Message.SECTION: "section",
+}
 COLLEGES = ["CAS", "CDS", "COM", "ENG", "SAR", "QST", "CGS", "SPH", "SED", "PDP"]
+
+
+def welcome_text() -> str:
+    return (
+        f"Welcome to Terrier Alert {get_sem_year()}!\n"
+        "Use the Menu button to get started."
+    )
+
+
+def parse_field(field: Message, text: str) -> str | None:
+    """Return the normalized input for a form field, or None if invalid"""
+    value = text.strip().upper()
+    return value if FIELD_PATTERNS[field].fullmatch(value) else None
 
 
 def get_main_buttons(user_cache: dict):
@@ -93,38 +105,6 @@ def get_main_buttons(user_cache: dict):
     return buttons
 
 
-def get_cred_buttons(user_cache: dict):
-    """Return user credential buttons"""
-    buttons = [
-        [
-            InlineKeyboardButton(
-                text="Input Username", callback_data=InputStates.INPUT_USERNAME
-            ),
-            InlineKeyboardButton(
-                text="Input Password", callback_data=InputStates.INPUT_PASSWORD
-            ),
-        ],
-        [InlineKeyboardButton(text="Cancel", callback_data=InputStates.CANCEL)],
-    ]
-
-    for changed_fields in user_cache:
-        if changed_fields == Message.USERNAME:
-            buttons[0][0] = InlineKeyboardButton(
-                text="Edit Username", callback_data=InputStates.INPUT_USERNAME
-            )
-        elif changed_fields == Message.PASSWORD:
-            buttons[0][1] = InlineKeyboardButton(
-                text="Edit Password", callback_data=InputStates.INPUT_PASSWORD
-            )
-
-    if all(field in user_cache for field in CRED_FIELDS):
-        buttons.insert(
-            -1, [InlineKeyboardButton(text="Submit", callback_data=InputStates.SUBMIT)]
-        )
-
-    return buttons
-
-
 def get_college_buttons():
     """Return college selection buttons"""
     return [
@@ -151,8 +131,12 @@ def get_course(user_cache: dict[str, str]):
     assert all(field in user_cache for field in FORM_FIELDS), (
         "User cache does not contain all form fields"
     )
-    course_str = f"{user_cache[Message.COLLEGE]} {user_cache[Message.DEPARTMENT]}{user_cache[Message.COURSE_NUM]} {user_cache[Message.SECTION]}"
-    return Course(course_str)
+    return Course(
+        user_cache[Message.COLLEGE],
+        user_cache[Message.DEPARTMENT],
+        user_cache[Message.COURSE_NUM],
+        user_cache[Message.SECTION],
+    )
 
 
 def get_subscription_md(user_cache: dict):
@@ -172,15 +156,6 @@ def get_subscription_md(user_cache: dict):
     return result
 
 
-def get_cred_text(user_cache: dict):
-    """Format user credentials"""
-    username = user_cache.get(Message.USERNAME, "")
-    password = user_cache.get(Message.PASSWORD, "")
-    masked_password = "*" * len(password)
-    privacy_note = "Note: Your credentials are only used to register for courses and are not stored.\n"
-    return f"{privacy_note}\nUsername: {username}\nPassword(hidden): {masked_password}"
-
-
 def recently_subscribed_md(time: str):
     return RECENTLY_SUBSCRIBED_MD.replace("@", time)
 
@@ -191,4 +166,4 @@ def already_subscribed_md(course: Course):
 
 def fields_equal(cache1: dict, cache2: dict, fields: set):
     """Check if two user caches have the same form fields"""
-    return all(cache1.get(field, None) == cache2.get(field, None) for field in fields)
+    return all(cache1.get(field) == cache2.get(field) for field in fields)

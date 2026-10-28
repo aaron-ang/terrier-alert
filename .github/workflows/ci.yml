@@ -9,67 +9,95 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.12"
+
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
-
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
 
-      - name: Install lint dependencies
+      - run: pip install "$(grep '^ruff==' requirements-dev.txt)"
+
+      - run: ruff check --output-format=github .
+
+      - run: ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - run: pip install -r requirements-dev.txt
+
+      # Live BU tests are opt-in (pytest -m live) so a BU outage cannot block merges
+      - run: python -m pytest -m "not live"
+
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Needs secrets, which pull requests from forks do not get
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Start service
+        env:
+          TEST_TELEGRAM_TOKEN: ${{ secrets.TEST_TELEGRAM_TOKEN }}
+          FEEDBACK_CHANNEL_ID: ${{ secrets.FEEDBACK_CHANNEL_ID }}
+          MONGO_URL: ${{ secrets.MONGO_URL }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: docker compose up --build --detach --wait --wait-timeout 90
+
+      - name: Check service stays healthy for 60s
         run: |
-          python -m pip install --upgrade pip
-          pip install flake8
-
-      - name: Lint with flake8
-        run: |
-          # stop if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-      - name: Create .env file
-        run: |
-          cat << EOF > .env
-          TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}
-          TEST_TELEGRAM_TOKEN=${{ secrets.TEST_TELEGRAM_TOKEN }}
-          FEEDBACK_CHANNEL_ID=${{ secrets.FEEDBACK_CHANNEL_ID }}
-          MONGO_URL=${{ secrets.MONGO_URL }}
-          REPO_URL=${{ github.server_url }}/${{ github.repository }}
-          EOF
-
-      - name: Run tests
-        run: |
-          python -m pip install -r requirements.txt
-          python -m pytest
-
-      - name: Build and Test Service
-        run: |
-          docker compose up --build -d
-
-          START_TIME=$(date +%s)
-          END_TIME=$((START_TIME + 90))
-
-          while [ $(date +%s) -lt $END_TIME ]; do
-            if ! docker ps | grep -q terrier-alert; then
-              echo "Service crashed!"
-              docker compose logs
+          for _ in $(seq 12); do
+            sleep 5
+            status=$(docker inspect --format '{{.State.Health.Status}}' "$(docker compose ps -q bot)" 2>/dev/null || echo exited)
+            if [ "$status" != healthy ]; then
+              echo "Service is $status"
               exit 1
             fi
-            sleep 5
           done
+          echo "Service stayed healthy for 60s"
 
-          echo "Service ran stable for 1.5 minutes"
-          docker compose down
+      - name: Show logs
+        if: always()
+        run: docker compose logs
 
-      - name: Deploy
-        if: github.ref == 'refs/heads/main'
+      - name: Stop service
+        if: always()
+        run: docker compose down
+
+  deploy:
+    needs: [lint, test, smoke]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: Trigger Render deploy
         env:
-          deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        run: |
-          curl "$deploy_url"
+          DEPLOY_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: curl --fail --silent --show-error --retry 3 --output /dev/null "$DEPLOY_URL"

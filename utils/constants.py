@@ -14,15 +14,11 @@ class TimeConstants(IntEnum):
 class InputStates(IntEnum):
     AWAIT_SELECTION = 1
     AWAIT_CUSTOM_INPUT = 2
-    AWAIT_INPUT_USERNAME = 3
-    AWAIT_INPUT_PASSWORD = 4
     AWAIT_FEEDBACK = 5
     INPUT_COLLEGE = 6
     INPUT_DEPARTMENT = 7
     INPUT_COURSE_NUM = 8
     INPUT_SECTION = 9
-    INPUT_USERNAME = 10
-    INPUT_PASSWORD = 11
     SUBMIT = 12
     PROCEED = 13
     CANCEL = 14
@@ -33,15 +29,13 @@ class Message(IntEnum):
     DEPARTMENT = 2
     COURSE_NUM = 3
     SECTION = 4
-    USERNAME = 5
-    PASSWORD = 6
     IS_SUBSCRIBED = 7
     LAST_SUBSCRIBED = 8
     LAST_SUBSCRIPTION = 9
     SUBSCRIPTION_MSG_ID = 10
     PROMPT_MSG_ID = 11
     INVALID_MSG_ID = 12
-    CRED_MSG_ID = 13
+    AWAITED_FIELD = 14
 
 
 FORM_FIELDS = {
@@ -50,8 +44,6 @@ FORM_FIELDS = {
     Message.COURSE_NUM,
     Message.SECTION,
 }
-
-CRED_FIELDS = {Message.USERNAME, Message.PASSWORD}
 
 UID = "user"
 USER_LIST = "users"

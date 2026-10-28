@@ -1,9 +1,10 @@
 """Set bot commands and descriptions"""
 
-import os
 import asyncio
-from telegram import Bot, BotCommand
+import os
+
 from dotenv import load_dotenv
+from telegram import Bot, BotCommand
 
 COMMANDS = [
     BotCommand("start", "Start the bot"),

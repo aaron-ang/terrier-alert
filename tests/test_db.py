@@ -1,27 +1,24 @@
-import os
-import sys
+from unittest.mock import MagicMock, patch
 
 import pendulum
 import pytest
-from unittest.mock import MagicMock, patch
 from pymongo.errors import PyMongoError
-from pymongo.synchronous.database import Database as MongoDB
 from pymongo.synchronous.collection import Collection
+from pymongo.synchronous.database import Database as MongoDB
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.db import Database
 from utils.constants import (
-    Environment,
     COURSE_LIST,
-    USER_LIST,
     COURSE_NAME,
+    IS_SUBSCRIBED,
+    LAST_SUBSCRIBED,
+    LAST_SUBSCRIPTION,
     SEM_YEAR,
     UID,
-    LAST_SUBSCRIBED,
-    IS_SUBSCRIBED,
-    LAST_SUBSCRIPTION,
+    USER_LIST,
+    Environment,
 )
-from utils.models import Course
+from utils.models import Course, get_sem_year
 
 
 @pytest.fixture
@@ -94,17 +91,17 @@ def test_get_user_course_found(db, mock_mongo_client):
 
 
 def test_subscribe_new_course(db, mock_mongo_client):
-    test_course = "CAS CS111 A1"
+    test_course = Course.parse("CAS CS111 A1")
     test_uid = "test123"
     test_time = pendulum.now()
-    test_sem_year = Course.get_sem_year()
+    test_sem_year = get_sem_year()
 
     db.subscribe(test_course, test_uid, test_time)
 
     # Verify course update
     mock_mongo_client[COURSE_LIST].update_one.assert_called_with(
-        {COURSE_NAME: test_course, SEM_YEAR: test_sem_year},
-        {"$setOnInsert": {SEM_YEAR: test_sem_year}, "$push": {USER_LIST: test_uid}},
+        {COURSE_NAME: str(test_course), SEM_YEAR: test_sem_year},
+        {"$setOnInsert": {SEM_YEAR: test_sem_year}, "$addToSet": {USER_LIST: test_uid}},
         upsert=True,
     )
 
@@ -117,7 +114,7 @@ def test_subscribe_new_course(db, mock_mongo_client):
         {
             "$set": {
                 IS_SUBSCRIBED: True,
-                LAST_SUBSCRIPTION: test_course,
+                LAST_SUBSCRIPTION: str(test_course),
             }
         },
         upsert=True,
@@ -125,14 +122,15 @@ def test_subscribe_new_course(db, mock_mongo_client):
 
 
 def test_unsubscribe_existing_user(db, mock_mongo_client):
-    test_course = "CAS CS111 A1"
+    test_course = Course.parse("CAS CS111 A1")
     test_uid = "test123"
 
     db.unsubscribe(test_course, test_uid)
 
     # Verify course update
-    mock_mongo_client[COURSE_LIST].update_one.assert_called_once_with(
-        {COURSE_NAME: test_course}, {"$pull": {USER_LIST: test_uid}}
+    mock_mongo_client[COURSE_LIST].update_many.assert_called_once_with(
+        {COURSE_NAME: str(test_course), USER_LIST: test_uid},
+        {"$pull": {USER_LIST: test_uid}},
     )
 
     # Verify user status update
@@ -141,7 +139,7 @@ def test_unsubscribe_existing_user(db, mock_mongo_client):
         {
             "$set": {
                 IS_SUBSCRIBED: False,
-                LAST_SUBSCRIPTION: test_course,
+                LAST_SUBSCRIPTION: str(test_course),
             }
         },
         upsert=True,
@@ -149,13 +147,11 @@ def test_unsubscribe_existing_user(db, mock_mongo_client):
 
 
 def test_remove_course(db, mock_mongo_client):
-    test_course = "CAS CS111 A1"
-    mock_mongo_client[COURSE_LIST].delete_one.return_value.deleted_count = 1
+    test_course = Course.parse("CAS CS111 A1")
 
-    result = db.remove_course(test_course)
-    assert result.deleted_count == 1
+    db.remove_course(test_course, "Fall 2026")
     mock_mongo_client[COURSE_LIST].delete_one.assert_called_once_with(
-        {COURSE_NAME: test_course}
+        {COURSE_NAME: str(test_course), SEM_YEAR: "Fall 2026", USER_LIST: {"$size": 0}}
     )
 
 
@@ -177,7 +173,7 @@ def test_update_subscription_time(db, mock_mongo_client):
 
 def test_update_subscription_status(db, mock_mongo_client):
     test_uid = "test123"
-    test_course = "CAS CS111 A1"
+    test_course = Course.parse("CAS CS111 A1")
 
     db.update_subscription_status(test_uid, test_course, True)
     mock_mongo_client[USER_LIST].update_one.assert_called_once_with(

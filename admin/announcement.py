@@ -1,15 +1,14 @@
 """One-time script to send out announcements to users"""
 
-import os
-import sys
 import asyncio
-import telegram
-from telegram import Message
-from dotenv import load_dotenv
+import os
 
-sys.path.append("./")
+import telegram
+from dotenv import load_dotenv
+from telegram import Message
+
 from src.db import Database
-from utils.constants import Environment, TimeConstants, UID
+from utils.constants import UID, Environment, TimeConstants
 
 
 async def send_maintenance_announcement():
