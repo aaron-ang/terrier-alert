@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import argparse
 import html
 import logging
 import os
@@ -15,8 +14,9 @@ from telegram import (
     Update,
     constants,
 )
-from telegram.error import TelegramError
+from telegram.error import Conflict, TelegramError
 from telegram.ext import (
+    Application,
     ApplicationBuilder,
     CallbackQueryHandler,
     CommandHandler,
@@ -385,6 +385,11 @@ async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 async def error_handler(_update: object, context: ContextTypes.DEFAULT_TYPE):
     """Send an error notification to Telegram feedback channel."""
+    if isinstance(context.error, Conflict):
+        # Two dev pollers share a token (e.g. a local run and CI's smoke test).
+        # Polling retries and takes over once the other one stops.
+        logger.warning("Another instance is polling: %s", context.error)
+        return
     logger.error("Unhandled exception", exc_info=context.error)
     tb_string = "".join(
         traceback.format_exception(None, context.error, context.error.__traceback__)
@@ -465,13 +470,8 @@ def create_conversation_handlers() -> list[ConversationHandler]:
     return handlers
 
 
-def main(env=Environment.PROD) -> None:
-    """Initialize and start the bot"""
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logger.info("Starting bot (%s)...", env)
+def build_application(env: Environment) -> Application:
+    """Build the bot with its handlers and the finder job. The caller runs it."""
     global DB
 
     if not DB:
@@ -498,24 +498,10 @@ def main(env=Environment.PROD) -> None:
     application.add_handler(MessageHandler(filters.COMMAND, unknown))
     application.add_error_handler(error_handler)
 
-    # Start job queue
+    # Schedule the finder; the job queue starts with the application
     finder = Finder(DB, BUClassSearch(), application.bot, FEEDBACK_CHANNEL_ID)
     application.job_queue.run_repeating(
         callback=finder.run, interval=FINDER_INTERVAL_SECONDS
     )
 
-    application.run_polling()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the bot")
-    parser.add_argument(
-        "--dev",
-        action="store_const",
-        const=Environment.DEV,
-        default=Environment.PROD,
-        help="Run the bot in development mode",
-        dest="env",
-    )
-    args = parser.parse_args()
-    main(args.env)
+    return application
