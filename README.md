@@ -21,6 +21,11 @@ Deployed on [Render](https://render.com/).
 
 ## Technical Details
 
+One process ([src/server.py](src/server.py)) serves the health check at `GET /`, receives Telegram updates by webhook at `POST /telegram`, and runs the bot and its finder job.
+The webhook URL is `WEBHOOK_URL`, or `RENDER_EXTERNAL_URL`, which Render sets for web services.
+Requests must carry a secret token derived from the bot token.
+In prod the server refuses to start without a webhook URL. In dev, without one, the bot polls instead.
+
 Seat data comes from BU's public class search through `BUClassSearch` in [src/search.py](src/search.py).
 `Finder` in [src/finder.py](src/finder.py) depends only on the `CourseSearch` protocol, so a different seat data source can replace BU's public search without changes to the finder.
 
@@ -51,7 +56,7 @@ pytest -m "not live"   # unit tests, no network
 pytest -m live         # queries BU's live class search; skips while BU is down
 ```
 
-Create a `.env` file with `TELEGRAM_TOKEN`, `TEST_TELEGRAM_TOKEN`, `FEEDBACK_CHANNEL_ID`, `MONGO_URL` and `REPO_URL`. Then run the dev bot:
+Create a `.env` file with `TELEGRAM_TOKEN`, `TEST_TELEGRAM_TOKEN`, `FEEDBACK_CHANNEL_ID`, `MONGO_URL` and `REPO_URL`. Then run the dev bot, which polls unless `WEBHOOK_URL` is set:
 
 ```sh
 ./src/main.sh --dev
