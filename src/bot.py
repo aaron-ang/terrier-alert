@@ -5,7 +5,7 @@ import html
 import logging
 import os
 import traceback
-from typing import Any, TypeAlias, cast
+from typing import Any, cast
 
 import pendulum
 from dotenv import load_dotenv
@@ -46,7 +46,7 @@ from utils.constants import (
 from utils.models import Course
 
 # Type alias for better readability
-UserCache: TypeAlias = dict[str, Any]
+type UserCache = dict[str, Any]
 
 # Initialize DB at module level
 DB: Database | None = None
