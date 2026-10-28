@@ -49,7 +49,7 @@ jobs:
 
       - run: pip install -r requirements-dev.txt
 
-      # Live BU tests run in bu-probe.yml so a BU outage cannot block merges
+      # Live BU tests are opt-in (pytest -m live) so a BU outage cannot block merges
       - run: python -m pytest -m "not live"
 
   smoke:
