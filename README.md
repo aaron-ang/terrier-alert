@@ -50,8 +50,8 @@ Each document in the _users_ collection has the following schema:
 
 ```sh
 uv sync
-uv run ruff check . && uv run ruff format --check .
-uv run mypy
+uvx pre-commit install       # ruff, mypy and uv.lock checks on each commit
+uvx pre-commit run --all-files
 uv run pytest -m "not live"   # unit tests, no network
 uv run pytest -m live         # queries BU's live class search; skips while BU is down
 ```
