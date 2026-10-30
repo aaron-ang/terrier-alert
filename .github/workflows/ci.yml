@@ -23,17 +23,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: requirements-dev.txt
+          enable-cache: true
 
-      - run: pip install "$(grep '^ruff==' requirements-dev.txt)"
+      - run: uv sync --locked --only-group dev
 
-      - run: ruff check --output-format=github .
+      - run: uv run --no-sync ruff check --output-format=github .
 
-      - run: ruff format --check .
+      - run: uv run --no-sync ruff format --check .
 
   test:
     runs-on: ubuntu-latest
@@ -41,18 +40,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-          cache-dependency-path: requirements*.txt
+          enable-cache: true
 
-      - run: pip install -r requirements-dev.txt
+      - run: uv sync --locked
 
-      - run: mypy
+      - run: uv run --no-sync mypy
 
       # Live BU tests are opt-in (pytest -m live) so a BU outage cannot block merges
-      - run: python -m pytest -m "not live"
+      - run: uv run --no-sync pytest -m "not live"
 
   smoke:
     runs-on: ubuntu-latest
