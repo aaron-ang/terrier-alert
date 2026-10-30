@@ -4,6 +4,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.13.6 /uv /usr/local/bin/uv
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONIOENCODING=UTF-8 \
+    UV_COMPILE_BYTECODE=1 \
     UV_NO_CACHE=1 \
     UV_LINK_MODE=copy \
     UV_PYTHON_DOWNLOADS=never \
