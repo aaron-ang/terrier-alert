@@ -20,7 +20,7 @@ COMMANDS = [
 
 async def main():
     load_dotenv()
-    BOT_TOKENS = [os.getenv("TELEGRAM_TOKEN"), os.getenv("TEST_TELEGRAM_TOKEN")]
+    BOT_TOKENS = [os.environ["TELEGRAM_TOKEN"], os.environ["TEST_TELEGRAM_TOKEN"]]
     for BOT_TOKEN in BOT_TOKENS:
         bot = Bot(token=BOT_TOKEN)
         successs = await bot.set_my_commands(COMMANDS)

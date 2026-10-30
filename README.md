@@ -49,11 +49,11 @@ Each document in the _users_ collection has the following schema:
 ## Development
 
 ```sh
-python -m venv .venv && . .venv/bin/activate
-pip install -r requirements-dev.txt
-ruff check . && ruff format --check .
-pytest -m "not live"   # unit tests, no network
-pytest -m live         # queries BU's live class search; skips while BU is down
+uv sync
+uvx pre-commit install       # ruff, mypy and uv.lock checks on each commit
+uvx pre-commit run --all-files
+uv run pytest -m "not live"   # unit tests, no network
+uv run pytest -m live         # queries BU's live class search; skips while BU is down
 ```
 
 Create a `.env` file with `TELEGRAM_TOKEN`, `TEST_TELEGRAM_TOKEN`, `FEEDBACK_CHANNEL_ID`, `MONGO_URL` and `REPO_URL`. Then run the dev bot, which polls unless `WEBHOOK_URL` is set:
@@ -62,4 +62,4 @@ Create a `.env` file with `TELEGRAM_TOKEN`, `TEST_TELEGRAM_TOKEN`, `FEEDBACK_CHA
 ./src/main.sh --dev
 ```
 
-Run the admin scripts from the repository root as modules, for example `python -m admin.commands`.
+Run the admin scripts from the repository root as modules, for example `uv run python -m admin.commands`.

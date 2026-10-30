@@ -6,7 +6,7 @@ import re
 from dotenv import load_dotenv
 from telegram import InlineKeyboardButton
 
-from utils.constants import FORM_FIELDS, InputStates, Message
+from utils.constants import FORM_FIELDS, InputStates, Message, UserCache
 from utils.models import Course, get_sem_year
 
 load_dotenv()
@@ -65,7 +65,7 @@ def parse_field(field: Message, text: str) -> str | None:
     return value if FIELD_PATTERNS[field].fullmatch(value) else None
 
 
-def get_main_buttons(user_cache: dict):
+def get_main_buttons(user_cache: UserCache):
     base_buttons = [
         [
             ("Input College", InputStates.INPUT_COLLEGE),
@@ -126,7 +126,7 @@ def get_confirmation_buttons():
     ]
 
 
-def get_course(user_cache: dict[str, str]):
+def get_course(user_cache: UserCache):
     """Convert user cache to Course object"""
     assert all(field in user_cache for field in FORM_FIELDS), (
         "User cache does not contain all form fields"
@@ -139,7 +139,7 @@ def get_course(user_cache: dict[str, str]):
     )
 
 
-def get_subscription_md(user_cache: dict):
+def get_subscription_md(user_cache: UserCache):
     """Format current subscription form data in markdown"""
     fields = {
         Message.COLLEGE: "College",
@@ -164,6 +164,6 @@ def already_subscribed_md(course: Course):
     return ALREADY_SUBSCRIBED_MD.replace("@", str(course))
 
 
-def fields_equal(cache1: dict, cache2: dict, fields: set):
+def fields_equal(cache1: UserCache, cache2: UserCache, fields: set[Message]):
     """Check if two user caches have the same form fields"""
     return all(cache1.get(field) == cache2.get(field) for field in fields)

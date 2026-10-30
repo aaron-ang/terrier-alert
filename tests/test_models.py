@@ -39,4 +39,4 @@ def test_course_parse_rejects_malformed(name):
     ],
 )
 def test_get_sem_year(date, expected):
-    assert get_sem_year(pendulum.parse(date)) == expected
+    assert get_sem_year(pendulum.from_format(date, "YYYY-MM-DD")) == expected

@@ -1,0 +1,42 @@
+[project]
+name = "terrier-alert"
+version = "0.1.0"
+description = "Telegram alerts when Boston University classes open up"
+requires-python = ">=3.12"
+dependencies = [
+    "certifi==2026.10.23",
+    "curl_cffi==0.17.0",
+    "fastapi[standard]==0.162.0",
+    "pendulum==3.3.0",
+    "pydantic==2.14.2",
+    "pymongo==4.19.0",
+    "python-dotenv==1.2.4",
+    "python-telegram-bot[ext]==22.8",
+]
+
+[dependency-groups]
+dev = [
+    "mypy==2.4.1",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1",
+    "ruff==0.17.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "SIM", "UP"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["live: hits BU's live class search (deselect with -m \"not live\")"]
+
+[tool.mypy]
+files = ["src", "utils", "admin", "tests"]
+check_untyped_defs = true

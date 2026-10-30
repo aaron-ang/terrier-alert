@@ -53,7 +53,10 @@ def create_app(
             )
             logger.info("Receiving updates by webhook at %s", url)
         else:
-            await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+            updater = application.updater
+            if updater is None:
+                raise RuntimeError("Polling needs the application's updater")
+            await updater.start_polling(allowed_updates=Update.ALL_TYPES)
             logger.info("Receiving updates by polling")
         await application.start()
         try:

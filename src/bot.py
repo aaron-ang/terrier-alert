@@ -4,20 +4,23 @@ import html
 import logging
 import os
 import traceback
-from typing import Any, cast
+from typing import cast
 
 import pendulum
 from dotenv import load_dotenv
 from telegram import (
+    CallbackQuery,
     ForceReply,
     InlineKeyboardMarkup,
     Update,
     constants,
 )
+from telegram import Message as TelegramMessage
 from telegram.error import Conflict, TelegramError
 from telegram.ext import (
     Application,
     ApplicationBuilder,
+    BaseHandler,
     CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
@@ -39,14 +42,12 @@ from utils.constants import (
     Environment,
     InputStates,
     TimeConstants,
+    UserCache,
 )
 from utils.constants import (
     Message as MsgEnum,
 )
 from utils.models import Course
-
-# Type alias for better readability
-type UserCache = dict[str, Any]
 
 # Initialize DB at module level
 DB: Database | None = None
@@ -65,6 +66,37 @@ INPUT_FIELDS = {
 logger = logging.getLogger(__name__)
 
 
+def require[T](value: T | None, error: str) -> T:
+    """Return a value the handler's trigger guarantees, or raise if it is missing"""
+    if value is None:
+        raise ValueError(error)
+    return value
+
+
+def database() -> Database:
+    return require(DB, "Database is not initialized")
+
+
+def message_of(update: Update) -> TelegramMessage:
+    return require(update.message, "Update has no message")
+
+
+def effective_message_of(update: Update) -> TelegramMessage:
+    return require(update.effective_message, "Update has no effective message")
+
+
+def query_of(update: Update) -> CallbackQuery:
+    return require(update.callback_query, "Update has no callback query")
+
+
+def user_id_of(update: Update) -> str:
+    return str(require(update.effective_user, "Update has no user").id)
+
+
+def chat_id_of(update: Update) -> int:
+    return require(update.effective_chat, "Update has no chat").id
+
+
 # Conversation helpers
 
 
@@ -72,8 +104,8 @@ def get_subscription_status(
     user_cache: UserCache, update: Update
 ) -> tuple[bool, pendulum.DateTime | None]:
     """Check user subscription and update cache"""
-    user_id = str(update.effective_user.id)
-    user = DB.get_user(user_id)
+    user_id = user_id_of(update)
+    user = database().get_user(user_id)
 
     user_cache[MsgEnum.IS_SUBSCRIBED] = user[IS_SUBSCRIBED] if user else False
     user_cache[MsgEnum.LAST_SUBSCRIBED] = (
@@ -85,7 +117,9 @@ def get_subscription_status(
         for key in FORM_FIELDS:
             user_cache.pop(key, None)
     elif not all(field in user_cache for field in FORM_FIELDS):
-        user_course = DB.get_user_course(user_id)
+        user_course = require(
+            database().get_user_course(user_id), "Subscribed user has no course"
+        )
         populate_cache(user_cache, user_course)
 
     return user_cache[MsgEnum.IS_SUBSCRIBED], user_cache[MsgEnum.LAST_SUBSCRIBED]
@@ -105,7 +139,7 @@ async def clear_invalid_msg(
 ):
     if MsgEnum.INVALID_MSG_ID in user_cache:
         await context.bot.delete_message(
-            update.effective_chat.id, user_cache.pop(MsgEnum.INVALID_MSG_ID)
+            chat_id_of(update), user_cache.pop(MsgEnum.INVALID_MSG_ID)
         )
 
 
@@ -114,7 +148,7 @@ async def clear_invalid_msg(
 
 async def start(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/start` command"""
-    await update.message.reply_text(conv.welcome_text(), do_quote=True)
+    await message_of(update).reply_text(conv.welcome_text(), do_quote=True)
 
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -125,25 +159,25 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Check user constraints (subscription status and time)
     if is_subscribed:
         course = conv.get_course(user_cache)
-        await update.message.reply_markdown_v2(
+        await message_of(update).reply_markdown_v2(
             conv.already_subscribed_md(course), do_quote=True
         )
         return ConversationHandler.END
 
-    if DB.env == Environment.PROD and last_subscribed:
+    if database().env == Environment.PROD and last_subscribed:
         next_subscribed = last_subscribed.add(hours=TimeConstants.REFRESH_TIME_HOURS)
         if pendulum.now() < next_subscribed:
             next_subscribed_local = next_subscribed.in_timezone(
                 "America/New_York"
             ).strftime("%b %d %I:%M%p %Z")
-            await update.message.reply_markdown_v2(
+            await message_of(update).reply_markdown_v2(
                 conv.recently_subscribed_md(next_subscribed_local), do_quote=True
             )
             return ConversationHandler.END
 
     buttons = conv.get_main_buttons(user_cache)
     keyboard = InlineKeyboardMarkup(buttons)
-    conv_message = await update.message.reply_markdown_v2(
+    conv_message = await message_of(update).reply_markdown_v2(
         text=conv.get_subscription_md(user_cache), do_quote=True, reply_markup=keyboard
     )
     user_cache[MsgEnum.SUBSCRIPTION_MSG_ID] = conv_message.message_id
@@ -153,7 +187,7 @@ async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def await_college_input(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Ask user for college input"""
-    query = update.callback_query
+    query = query_of(update)
     await query.answer()
 
     buttons = conv.get_college_buttons()
@@ -163,7 +197,7 @@ async def await_college_input(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Check callback data and update cache for chosen college"""
-    query = update.callback_query
+    query = query_of(update)
     await query.answer()
 
     user_cache = cast(UserCache, context.user_data)
@@ -179,16 +213,18 @@ async def save_college_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def await_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask user for the department, course number or section"""
-    query = update.callback_query
+    query = query_of(update)
     await query.answer()
     user_cache = cast(UserCache, context.user_data)
     await clear_invalid_msg(user_cache, update, context)
 
-    field = INPUT_FIELDS[InputStates(int(query.data))]
+    field = INPUT_FIELDS[
+        InputStates(int(require(query.data, "Callback query has no data")))
+    ]
     user_cache[MsgEnum.AWAITED_FIELD] = field
 
     prompt = await context.bot.send_message(
-        update.effective_chat.id,
+        chat_id_of(update),
         f"State the {conv.FIELD_LABELS[field]}",
         reply_markup=ForceReply(),
     )
@@ -198,19 +234,19 @@ async def await_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Validate the reply against the field that was asked for and update cache"""
-    message = update.message
+    message = message_of(update)
     await message.delete()
 
     user_cache = cast(UserCache, context.user_data)
     prompt_msg_id = user_cache.get(MsgEnum.PROMPT_MSG_ID, None)
     assert prompt_msg_id, "Prompt message ID not found"
-    await context.bot.delete_message(update.effective_chat.id, prompt_msg_id)
+    await context.bot.delete_message(chat_id_of(update), prompt_msg_id)
 
     field = user_cache.pop(MsgEnum.AWAITED_FIELD, None)
     assert field, "Awaited field not found"
     user_cache_snapshot = user_cache.copy()
 
-    if value := conv.parse_field(field, message.text):
+    if value := conv.parse_field(field, require(message.text, "Message has no text")):
         user_cache[field] = value
     else:
         msg = await message.reply_text(
@@ -223,7 +259,7 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
         assert sub_msg_id, "Subscription message ID not found"
         await context.bot.edit_message_text(
             text=conv.get_subscription_md(user_cache),
-            chat_id=update.effective_chat.id,
+            chat_id=chat_id_of(update),
             message_id=sub_msg_id,
             parse_mode=constants.ParseMode.MARKDOWN_V2,
             reply_markup=InlineKeyboardMarkup(conv.get_main_buttons(user_cache)),
@@ -233,19 +269,21 @@ async def save_custom_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def submit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Save subscription to database"""
-    query = update.callback_query
+    query = query_of(update)
     await query.answer()
     await query.edit_message_text("Submitting...")
 
     user_cache = cast(UserCache, context.user_data)
     course = conv.get_course(user_cache)
-    user_id = str(update.effective_user.id)
+    user_id = user_id_of(update)
     curr_time = pendulum.now()
-    DB.subscribe(course, user_id, curr_time)
+    database().subscribe(course, user_id, curr_time)
 
     user_cache[MsgEnum.IS_SUBSCRIBED] = True
     user_cache[MsgEnum.LAST_SUBSCRIBED] = curr_time
-    await update.effective_message.reply_text(f"You are now subscribed to {course}.")
+    await effective_message_of(update).reply_text(
+        f"You are now subscribed to {course}."
+    )
     return ConversationHandler.END
 
 
@@ -255,18 +293,18 @@ async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
     is_subscribed, _ = get_subscription_status(user_cache, update)
     if is_subscribed:
         course = conv.get_course(user_cache)
-        await update.message.reply_markdown_v2(
+        await message_of(update).reply_markdown_v2(
             conv.already_subscribed_md(course), do_quote=True
         )
         return ConversationHandler.END
 
     last_subscribed_course = user_cache.get(MsgEnum.LAST_SUBSCRIPTION, "")
     if last_subscribed_course == "":
-        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, do_quote=True)
+        await message_of(update).reply_text(conv.NOT_SUBSCRIBED_TEXT, do_quote=True)
         return ConversationHandler.END
 
     text = f"Confirm resubscription to {last_subscribed_course}?"
-    await update.message.reply_text(
+    await message_of(update).reply_text(
         text=text,
         do_quote=True,
         reply_markup=InlineKeyboardMarkup(conv.get_confirmation_buttons()),
@@ -276,7 +314,7 @@ async def resubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Resubscribe user to course"""
-    query = update.callback_query
+    query = query_of(update)
     await query.answer()
 
     user_cache = cast(UserCache, context.user_data)
@@ -284,13 +322,13 @@ async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert last_subscribed_course_str, "Last subscribed course not found"
 
     last_subscribed_course = Course.parse(last_subscribed_course_str)
-    user_id = str(update.effective_user.id)
+    user_id = user_id_of(update)
     curr_time = pendulum.now()
-    DB.subscribe(last_subscribed_course, user_id, curr_time)
+    database().subscribe(last_subscribed_course, user_id, curr_time)
 
     user_cache[MsgEnum.IS_SUBSCRIBED] = True
     user_cache[MsgEnum.LAST_SUBSCRIBED] = curr_time
-    await update.effective_message.edit_text(
+    await effective_message_of(update).edit_text(
         f"Successfully resubscribed to {last_subscribed_course}."
     )
     return ConversationHandler.END
@@ -298,34 +336,35 @@ async def resubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def unsubscribe_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Ask user for confirmation to unsubscribe"""
-    is_subscribed, _ = get_subscription_status(context.user_data, update)
+    user_cache = cast(UserCache, context.user_data)
+    is_subscribed, _ = get_subscription_status(user_cache, update)
     if is_subscribed:
         buttons = conv.get_confirmation_buttons()
         keyboard = InlineKeyboardMarkup(buttons)
-        await update.message.reply_text(
+        await message_of(update).reply_text(
             conv.UNSUBSCRIBE_TEXT, do_quote=True, reply_markup=keyboard
         )
         return InputStates.AWAIT_SELECTION
     else:
-        await update.message.reply_text(conv.NOT_SUBSCRIBED_TEXT, do_quote=True)
+        await message_of(update).reply_text(conv.NOT_SUBSCRIBED_TEXT, do_quote=True)
         return ConversationHandler.END
 
 
 async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Unsubscribe user from course"""
-    query = update.callback_query
+    query = query_of(update)
     await query.answer()
 
     user_cache = cast(UserCache, context.user_data)
     course = conv.get_course(user_cache)
-    user_id = str(update.effective_user.id)
-    DB.unsubscribe(course, user_id)
+    user_id = user_id_of(update)
+    database().unsubscribe(course, user_id)
 
     for key in FORM_FIELDS:
         user_cache.pop(key, None)
     user_cache[MsgEnum.IS_SUBSCRIBED] = False
 
-    await update.effective_message.edit_text(
+    await effective_message_of(update).edit_text(
         f"You have been unsubscribed from {course}."
     )
     return ConversationHandler.END
@@ -333,7 +372,7 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def await_feedback(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Ask user for feedback"""
-    await update.message.reply_text(
+    await message_of(update).reply_text(
         conv.FEEDBACK_TEXT, do_quote=True, reply_markup=ForceReply()
     )
     return InputStates.AWAIT_FEEDBACK
@@ -341,46 +380,47 @@ async def await_feedback(update: Update, _: ContextTypes.DEFAULT_TYPE):
 
 async def save_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Redirect feedback to feedback channel"""
-    feedback = update.message.text
+    feedback = message_of(update).text
     try:
         await context.bot.send_message(
             chat_id=FEEDBACK_CHANNEL_ID, text=f"Feedback: {feedback}"
         )
     except TelegramError:
         logger.exception("Failed to forward feedback")
-        await update.message.reply_text(conv.FEEDBACK_FAILURE_TEXT)
+        await message_of(update).reply_text(conv.FEEDBACK_FAILURE_TEXT)
     else:
-        await update.message.reply_text(conv.FEEDBACK_SUCCESS_TEXT)
+        await message_of(update).reply_text(conv.FEEDBACK_SUCCESS_TEXT)
     return ConversationHandler.END
 
 
 async def help_command(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/help` command"""
-    await update.message.reply_markdown_v2(conv.HELP_MD, do_quote=True)
+    await message_of(update).reply_markdown_v2(conv.HELP_MD, do_quote=True)
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels and ends the conversation"""
-    await clear_invalid_msg(context.user_data, update, context)
-    context.user_data.pop(MsgEnum.AWAITED_FIELD, None)
+    user_cache = cast(UserCache, context.user_data)
+    await clear_invalid_msg(user_cache, update, context)
+    user_cache.pop(MsgEnum.AWAITED_FIELD, None)
 
     abort_msg = "Aborted."
     if query := update.callback_query:
         await query.answer()
-        await update.effective_message.edit_text(abort_msg)
+        await effective_message_of(update).edit_text(abort_msg)
     else:
-        await context.bot.send_message(update.effective_chat.id, abort_msg)
+        await context.bot.send_message(chat_id_of(update), abort_msg)
     return ConversationHandler.END
 
 
 async def about(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle `/about` command"""
-    await update.message.reply_markdown_v2(conv.ABOUT_MD, do_quote=True)
+    await message_of(update).reply_markdown_v2(conv.ABOUT_MD, do_quote=True)
 
 
 async def unknown(update: Update, _: ContextTypes.DEFAULT_TYPE):
     """Handle unknown commands"""
-    await update.message.reply_text(conv.UNKNOWN_CMD_TEXT, do_quote=True)
+    await message_of(update).reply_text(conv.UNKNOWN_CMD_TEXT, do_quote=True)
 
 
 async def error_handler(_update: object, context: ContextTypes.DEFAULT_TYPE):
@@ -392,7 +432,9 @@ async def error_handler(_update: object, context: ContextTypes.DEFAULT_TYPE):
         return
     logger.error("Unhandled exception", exc_info=context.error)
     tb_string = "".join(
-        traceback.format_exception(None, context.error, context.error.__traceback__)
+        traceback.format_exception(
+            require(context.error, "Error handler ran without an error")
+        )
     )
     template = "An exception was raised while handling an update\n<pre>{tb}</pre>"
     # Keep the tail of the traceback, where the error is, within Telegram's limit
@@ -412,7 +454,9 @@ def create_conversation_handlers() -> list[ConversationHandler]:
     """Create all conversation handlers for the bot"""
     subscription_pattern = f"^({InputStates.INPUT_DEPARTMENT}|{InputStates.INPUT_COURSE_NUM}|{InputStates.INPUT_SECTION})$"
 
-    subscription_sel_handlers = [
+    subscription_sel_handlers: list[
+        BaseHandler[Update, ContextTypes.DEFAULT_TYPE, object]
+    ] = [
         CallbackQueryHandler(await_college_input, f"^{InputStates.INPUT_COLLEGE}$"),
         CallbackQueryHandler(await_custom_input, subscription_pattern),
         CallbackQueryHandler(submit, f"^{InputStates.SUBMIT}$"),
@@ -477,9 +521,9 @@ def build_application(env: Environment) -> Application:
     if not DB:
         DB = Database(env)
 
-    bot_token = os.getenv(
+    bot_token = os.environ[
         "TELEGRAM_TOKEN" if env == Environment.PROD else "TEST_TELEGRAM_TOKEN"
-    )
+    ]
     application = ApplicationBuilder().token(bot_token).build()
 
     # Add conversation handlers
@@ -500,8 +544,7 @@ def build_application(env: Environment) -> Application:
 
     # Schedule the finder; the job queue starts with the application
     finder = Finder(DB, BUClassSearch(), application.bot, FEEDBACK_CHANNEL_ID)
-    application.job_queue.run_repeating(
-        callback=finder.run, interval=FINDER_INTERVAL_SECONDS
-    )
+    job_queue = require(application.job_queue, "Application has no job queue")
+    job_queue.run_repeating(callback=finder.run, interval=FINDER_INTERVAL_SECONDS)
 
     return application
