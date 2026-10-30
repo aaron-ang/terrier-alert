@@ -1,4 +1,5 @@
 from enum import IntEnum, StrEnum
+from typing import Any
 
 
 class Environment(StrEnum):
@@ -36,6 +37,9 @@ class Message(IntEnum):
     PROMPT_MSG_ID = 11
     INVALID_MSG_ID = 12
     AWAITED_FIELD = 14
+
+
+type UserCache = dict[Message, Any]
 
 
 FORM_FIELDS = {

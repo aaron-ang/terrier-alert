@@ -10,6 +10,9 @@ from telegram import Message
 from src.db import Database
 from utils.constants import UID, Environment, TimeConstants
 
+BOT: telegram.Bot
+DB: Database
+
 
 async def send_maintenance_announcement():
     """Send maintenance message to all users"""
@@ -43,7 +46,7 @@ async def send_live_announcement():
     await broadcast_message(announcement)
 
 
-async def broadcast_message(message):
+async def broadcast_message(message: str):
     """Send message to all users"""
     for user in DB.get_all_users():
         try:
@@ -61,9 +64,9 @@ async def broadcast_message(message):
 async def main(env: Environment):
     global BOT, DB
     load_dotenv()
-    bot_token = os.getenv(
+    bot_token = os.environ[
         "TELEGRAM_TOKEN" if env == Environment.PROD else "TEST_TELEGRAM_TOKEN"
-    )
+    ]
     BOT = telegram.Bot(bot_token)
     DB = Database(env)
     await send_live_announcement()

@@ -49,6 +49,8 @@ jobs:
 
       - run: pip install -r requirements-dev.txt
 
+      - run: mypy
+
       # Live BU tests are opt-in (pytest -m live) so a BU outage cannot block merges
       - run: python -m pytest -m "not live"
 
